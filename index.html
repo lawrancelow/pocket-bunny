@@ -449,7 +449,7 @@ function stepMinute(t){
     if(isMain(r))stepMain(r,t,sit||awayR(r,t));else stepFamily(r,t);
     if(S.rabbits.includes(r))stepPreg(r,t);
   }
-  for(const g of S.rabbits.filter(r=>r.guest)){if(t>=g.leaveAt){S.rabbits.splice(S.rabbits.indexOf(g),1);VIS.delete(g.id);const m=`${g.name}玩够了，回${g.owner}家了`;log(t,m);emit(m,'good');}}
+  for(const g of S.rabbits.filter(r=>r.guest)){if(t>=g.leaveAt){try{sendBackReport(g,false);}catch(e){}S.rabbits.splice(S.rabbits.indexOf(g),1);VIS.delete(g.id);const m=`${g.name}玩够了，回${g.owner}家了`;log(t,m);emit(m,'good');}}
   for(const n of S.nests.slice()){
     if(n.pick)continue;
     if(!S.rabbits.some(k=>k.nestId===n.id&&k.stage==='nest')){S.nests.splice(S.nests.indexOf(n),1);const m=`兔宝宝出窝了，满地跑来跑去`;log(t,m);emit(m,'good');}
@@ -969,7 +969,7 @@ function needMain(){const r=mainR();if(!r){sndNo();return null;}if(homeAway()){c
 function activate(id){
   if(id==='feed'){const r=needMain();if(!r)return;if(isAsleep(r,now())){cap(`嘘，${r.name}在睡觉`);sndNo();selIcon=-1;return;}setScreen(feedMenu(r));}
   else if(id==='light'){S.light=!S.light;sndClick();cap(S.light?'开灯':'关灯');selIcon=-1;save();}
-  else if(id==='play'){const r=needMain();if(!r)return;const why=cantPlay(r);if(why){cap(why);sndNo();selIcon=-1;return;}setScreen(menu('玩耍 · '+r.name,()=>{const L=GAMES.map(x=>({t:x.n,s:x.s+(bestOf(x.id)?` · 最高${bestOf(x.id)}`:''),on:()=>x.f(r)}));if((r.tricks||[]).length)L.unshift({t:'叫它表演',s:`会${r.tricks.length}种把戏`,on:()=>setScreen(trickMenu(r))});L.unshift({t:'带它去散步',s:'出门走走',dis:walkBlock(r),on:()=>setScreen(walkMenu(r))});return L;},null,`${GAMES.length}个游戏`));}
+  else if(id==='play'){const r=needMain();if(!r)return;const why=cantPlay(r);if(why){cap(why);sndNo();selIcon=-1;return;}setScreen(menu('玩耍 · '+r.name,()=>{const L=GAMES.map(x=>({t:x.n,s:x.s+(bestOf(x.id)?` · 最高${bestOf(x.id)}`:''),on:()=>x.f(r)}));if((r.tricks||[]).length)L.unshift({t:'叫它表演',s:`会${r.tricks.length}种把戏`,on:()=>setScreen(trickMenu(r))});L.unshift({t:'兔子公园',s:'和好友相遇',dis:mpBlock(),h:'进公园就能遇到在线好友的兔子',on:()=>parkScreen()});L.unshift({t:'约好友抢胡萝卜',s:'实时对战',dis:mpBlock()||(Object.keys(netS().friends).some(fu=>isFresh(NET.live[fu]))?null:'现在没有在线的好友'),on:()=>setScreen(menu('约谁玩？',Object.entries(netS().friends).filter(([fu])=>isFresh(NET.live[fu])).map(([fu,f])=>({t:f.nick,s:'在线',on:()=>inviteCarrot(fu)})),null))});L.unshift({t:'带它去散步',s:'出门走走',dis:walkBlock(r),on:()=>setScreen(walkMenu(r))});return L;},null,`${GAMES.length}个游戏`));}
   else if(id==='med'){const r=needMain();if(!r)return;medicine(r);selIcon=-1;}
   else if(id==='clean'){if(!S.poops.length){cap('兔舍很干净');sndNo();}else{S.poops=[];S.dirtySince=0;dn(mainR(),'clean');FX.push({k:'sweep',life:.9});sndOk();cap('打扫干净了！');tutDone(3);}selIcon=-1;save();}
   else if(id==='status'){const r=mainR();if(!r){sndNo();return;}setScreen(profileScreen(r,null,S.tut===4?1:0));tutDone(4);}
@@ -1021,7 +1021,7 @@ function pet(r){
     const m=mainR();const rel=r.guest?`${r.owner}家的客人`:m?relTo(r,m.id):'家人';
     if(isAsleep(r,t)){cap(`${r.name}（${rel}）在睡觉`);return;}
     if(r.tr.cuddly<=32&&Math.random()<.5){start(r,v,'back');cap(`${r.name}（${rel}）不太想被摸 · ${titleP(r)}`,4);return;}
-    start(r,v,'purr');FX.push({k:'heart',x:v.x,y:v.y-18,life:1});cap(`${r.name}（${rel}）· ${titleP(r)}`,4);sndClick();return;
+    if(r.guest)guestCare(r,'p');start(r,v,'purr');FX.push({k:'heart',x:v.x,y:v.y-18,life:1});cap(`${r.name}（${rel}）· ${titleP(r)}`,4);sndClick();return;
   }
   if(r.stage==='nest')return;
   if(r.scared){r.scared=0;delete r.calls.scared;affAdd(r,2);cap(`你摸摸${r.name}，它安心下来了`);start(r,v,'purr');sndOk();save();return;}
@@ -1220,7 +1220,7 @@ function helpScreen(){
     `<p>成年后可以在「家族」里找对象。两只都醒着、你的兔子开心时，感情会慢慢变好，满了就能配对。</p><p>怀孕约24小时，生下2～5只宝宝。毛色、耳朵、性格都会遗传。家里最多住8只。</p>`,
     `<p>要出门或睡觉前，可以在「家族」里请邻居照顾，最多10小时。这段时间不会算照顾失误。</p>`,
     `<p>「家族 → 朋友联机」可以和朋友互传兔子码：串门码让你的兔子去朋友家玩3小时、礼物码送礼、宝宝码送养兔子。</p><p>客人兔成年的话可以和你的兔子相亲。母兔那一方会生下宝宝，宝宝带着两家的血统。每个码只能用一次。</p>`,
-    `<p>你越用心照顾，兔子跟你越亲密（「状态」里看得到）。越亲密，它越常做出可爱的小举动，还会叼礼物给你。</p><p>特别的时刻会自动拍下来，放进「兔谱 → 回忆册」。</p><p><b>散步</b>：「玩耍 → 带它去散步」。路上遇到东西会停下来，按 B 去看看、A 继续走、C 提早回家。越亲密、去得越多，能去的地方越多。</p><p><b>出门</b>：兔子去朋友家串门、或托给邻居阿姨照顾时，会真的离开家，屏幕上会显示回来的倒数时间。想提早接回来，去「家族」里选「接回来」。</p><p><b>朋友簿</b>：收到过码的朋友都会记在「家族 → 朋友联机 → 朋友簿」。见过的朋友兔子可以直接「向它求亲」，也能约朋友的兔子赛跑，双方都看得到同一场比赛。</p><p><b>好友（实时）</b>：在「家族 → 朋友联机 → 好友」拿你的好友码给朋友，对方加了以后，双方的兔子会实时出现在「找对象」里。可以直接约朋友的兔子去花园玩、求亲，对方手机会马上收到，两边一起看约会。要有网络才能用，没网络照样能养兔子。</p><p><b>兔子谈恋爱</b>：别人家的兔子来串门时，两只会自己玩在一起；在「家族」里点客人，选「一起去花园玩」约会。感情分四级：初识 → 玩伴 → 喜欢（会主动依偎）→ 相爱。到「相爱」才会在约会时交配，也才能向朋友的兔子求亲。相爱之后分开了，你的兔子会想念对方，屏幕下方会提醒你。</p><p><b>兔子生气了</b>：被冤枉骂、打针、摸太多次都会让它背对你。喂它最爱的零食马上就好；或者每隔一会儿轻轻摸它一下，摸三次它就会原谅你（一直狂点没用）。不理它的话，几分钟后也会自己消气。</p><p><b>日记</b>：兔子每晚会把这一天写成日记，在「兔谱 → 兔子日记」。</p><p><b>探险</b>：你离开四小时以上，胆大的兔子可能偷偷出门，寄回明信片和宝物。</p>`,
+    `<p>你越用心照顾，兔子跟你越亲密（「状态」里看得到）。越亲密，它越常做出可爱的小举动，还会叼礼物给你。</p><p>特别的时刻会自动拍下来，放进「兔谱 → 回忆册」。</p><p><b>散步</b>：「玩耍 → 带它去散步」。路上遇到东西会停下来，按 B 去看看、A 继续走、C 提早回家。越亲密、去得越多，能去的地方越多。</p><p><b>出门</b>：兔子去朋友家串门、或托给邻居阿姨照顾时，会真的离开家，屏幕上会显示回来的倒数时间。想提早接回来，去「家族」里选「接回来」。</p><p><b>朋友簿</b>：收到过码的朋友都会记在「家族 → 朋友联机 → 朋友簿」。见过的朋友兔子可以直接「向它求亲」，也能约朋友的兔子赛跑，双方都看得到同一场比赛。</p><p><b>和好友一起玩</b>：「玩耍」里有「约好友抢胡萝卜」（两人实时比赛）和「兔子公园」（遇到在线好友的兔子，A 丢胡萝卜、B 碰鼻子）。在「家族 → 好友」点好友，可以送今天的礼物，连续送三天会得到友情徽章。兔子去好友家住时，好友可以喂它、摸它，它回家会带回住宿报告。</p><p><b>好友（实时）</b>：在「家族 → 朋友联机 → 好友」拿你的好友码给朋友，对方加了以后，双方的兔子会实时出现在「找对象」里。可以直接约朋友的兔子去花园玩、求亲，对方手机会马上收到，两边一起看约会。要有网络才能用，没网络照样能养兔子。</p><p><b>兔子谈恋爱</b>：别人家的兔子来串门时，两只会自己玩在一起；在「家族」里点客人，选「一起去花园玩」约会。感情分四级：初识 → 玩伴 → 喜欢（会主动依偎）→ 相爱。到「相爱」才会在约会时交配，也才能向朋友的兔子求亲。相爱之后分开了，你的兔子会想念对方，屏幕下方会提醒你。</p><p><b>兔子生气了</b>：被冤枉骂、打针、摸太多次都会让它背对你。喂它最爱的零食马上就好；或者每隔一会儿轻轻摸它一下，摸三次它就会原谅你（一直狂点没用）。不理它的话，几分钟后也会自己消气。</p><p><b>日记</b>：兔子每晚会把这一天写成日记，在「兔谱 → 兔子日记」。</p><p><b>探险</b>：你离开四小时以上，胆大的兔子可能偷偷出门，寄回明信片和宝物。</p>`,
     `<p>「玩耍」里有7个小游戏：猜方向、跳栏赛、接零食、打地鼠、跟我做、兔子长龙、俄罗斯方块。</p><p>玩得好兔子会更开心，活泼的兔子开心得更多。每个游戏都会记最高纪录。玩到一半想离开，点下面那行提示字就行。</p>`
   ],()=>setScreen(bookMenu()));
 }
@@ -1253,7 +1253,7 @@ const rid=()=>Math.random().toString(36).slice(2,10).padEnd(8,'0');
 function fnv(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return(h>>>0).toString(16).padStart(8,'0').slice(0,6);}
 const GIFTS={cake:['胡萝卜蛋糕','收到的兔子开心度＋2'],hay:['干草大礼包','吃得饱饱的，肠胃也变好'],clover:['幸运草','生病的话马上就好']};
 const VISIT_H=3;
-function mkCode(o){o.v=1;o.id=rid()+rid();o.pid=pid();{const u=(o.r&&o.r.u)||(o.a&&o.a.u);if(u){const lv=loveExport(u);if(Object.keys(lv).length)o.lv=lv;}}S.myCodes=S.myCodes||[];S.myCodes.push(o.id);if(S.myCodes.length>300)S.myCodes.splice(0,S.myCodes.length-300);save();o.n=S.nick||'兔主人';o.at=now();const b=btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');return'TUWO1.'+b+'.'+fnv(b);}
+function mkCode(o){o.v=1;o.id=rid()+rid();o.pid=pid();if(S.net&&S.net.uid)o.fu=S.net.uid;{const u=(o.r&&o.r.u)||(o.a&&o.a.u);if(u){const lv=loveExport(u);if(Object.keys(lv).length)o.lv=lv;}}S.myCodes=S.myCodes||[];S.myCodes.push(o.id);if(S.myCodes.length>300)S.myCodes.splice(0,S.myCodes.length-300);save();o.n=S.nick||'兔主人';o.at=now();const b=btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');return'TUWO1.'+b+'.'+fnv(b);}
 function readCode(text){
   const m=String(text||'').replace(/\s+/g,'').match(/TUWO1\.([A-Za-z0-9_-]+)\.([0-9a-f]{6})/);
   if(!m)return{err:'没有找到兔子码。请把朋友发来的整段文字贴进来'};
@@ -1305,7 +1305,7 @@ function netMenu(){
   return menu('朋友联机 · 兔子码',()=>{const m=mainR();return[
     {t:'好友（实时）',s:typeof NET!=='undefined'?(NET.status==='online'?`${Object.keys(netS().friends).length}位 · 已连线`:NET.status==='nocfg'?'服务器未设定':'离线'):'',h:'加好友后，在「找对象」里实时看到朋友的兔子，约会、求亲不用再复制码',on:()=>setScreen(netFriendsMenu())},
     {t:'贴上朋友的码',s:'串门、求亲、赛跑…',h:'把朋友发来的整段文字贴进来',on:()=>setScreen(pasteScreen())},
-    {t:'我的兔子去串门',s:m&&m.away?`回来还要${durText(m.away.until-now())}`:'生成串门码',h:m?`${m.name}会出门去朋友家玩${VISIT_H}小时，这段时间家里看不到它`:'现在没有兔子',dis:visitBlock(m),on:()=>sendVisit(m)},
+    {t:'我的兔子去串门',s:m&&m.away?`回来还要${durText(m.away.until-now())}`:'生成串门码',h:m?`${m.name}会出门去朋友家玩${VISIT_H}小时，这段时间家里看不到它`:'现在没有兔子',dis:visitBlock(m),on:()=>setScreen(stayMenu(m))},
     {t:'朋友簿',s:`${friendList().length}位朋友`,h:'认识的人和他们的兔子：求亲、约赛跑',on:()=>setScreen(friendsMenu())},
     {t:'赛跑挑战',s:'生成挑战码',h:'和朋友的兔子比赛跑，双方都能看到整场比赛',dis:raceBlock(),on:()=>sendRace()},
     {t:'送礼物',s:'生成礼物码',on:()=>setScreen(giftMenu())},
@@ -1336,7 +1336,7 @@ function receiveCode(text){
   if(S.myCodes&&S.myCodes.includes(c.id)){cap('这是你自己生成的码，要发给朋友才有用',5);sndNo();return;}
   if(S.usedCodes.includes(c.id)){cap('这个码已经用过了，每个码只能用一次',5);sndNo();return;}
   try{loveMerge(c.lv,c.r||c.a,String(c.n||'朋友').slice(0,8));}catch(e){}
-  const ok=c.t==='visit'?recvVisit(c):c.t==='gift'?recvGift(c):c.t==='kit'?recvKit(c):c.t==='mate'?recvMate(c):c.t==='propose'?recvPropose(c):c.t==='reply'?recvReply(c):c.t==='race'?recvRace(c):c.t==='raceR'?recvRaceR(c):c.t==='dateR'?recvDateR(c):c.t==='odate'?recvODate(c):c.t==='odateR'?recvODateR(c):(cap('看不懂这种码，请朋友更新游戏',5),false);
+  const ok=c.t==='visit'?recvVisit(c):c.t==='gift'?recvGift(c):c.t==='kit'?recvKit(c):c.t==='mate'?recvMate(c):c.t==='propose'?recvPropose(c):c.t==='reply'?recvReply(c):c.t==='race'?recvRace(c):c.t==='raceR'?recvRaceR(c):c.t==='dateR'?recvDateR(c):c.t==='odate'?recvODate(c):c.t==='dgift'?recvDGift(c):c.t==='back'?recvBack(c):c.t==='odateR'?recvODateR(c):(cap('看不懂这种码，请朋友更新游戏',5),false);
   if(ok){const fr=friendOf(c);fr.k=(fr.k||0)+1;if((c.t==='visit'||c.t==='mate')&&c.r)friendSaw(fr,c.r);S.usedCodes.push(c.id);if(S.usedCodes.length>300)S.usedCodes.splice(0,S.usedCodes.length-300);save();}
 }
 function recvVisit(c){
@@ -1345,11 +1345,11 @@ function recvVisit(c){
   if(guests().some(o=>o.uid===p.uid)){cap(`${p.name}已经在你家做客了`,4);sndNo();return false;}
   if(guests().length>=2){cap('家里已经有两位客人了，等它们回家再来',5);sndNo();return false;}
   const t=now();const g=newRabbit({g:p.g,sex:p.sex,born:t-p.age*MIN,stage:p.stage,p:p.p,name:p.name,gen:p.gen});
-  Object.assign(g,{uid:p.uid,ancU:p.ancU,momName:p.momName,dadName:p.dadName,seed:p.seed,guest:true,owner:String(c.n||'朋友').slice(0,8),leaveAt:t+VISIT_H*60*MIN,tryAt:0});
+  Object.assign(g,{uid:p.uid,ancU:p.ancU,momName:p.momName,dadName:p.dadName,seed:p.seed,guest:true,owner:String(c.n||'朋友').slice(0,8),leaveAt:t+clamp(+c.h||VISIT_H,1,24)*60*MIN,tryAt:0,ownerFu:c.fu||null,arrAt:t});
   S.rabbits.push(g);dexAdd(g);S.lastFriend={name:g.name,ck:phen(g.g).ck};log(t,`${g.name}从${g.owner}家来串门了`);dn(mainR(),'guests',g.name);save();
   const rows=GAMES.map(x=>{const a=bestOf(x.id),b=(c.best&&+c.best[x.id])||0;return`<p class="row"><span>${x.n}</span><span>你 <b>${a||'—'}</b> ： <b>${b||'—'}</b> ${esc(g.owner)}</span></p>`;}).join('');
   setScreen(pages(i=>[`${g.name}来串门了！`,'性格','比一比纪录'][i],[
-    `<p><b>${esc(g.name)}</b> ${sexS(g)} 从<b>${esc(g.owner)}</b>家来玩了，会待${VISIT_H}小时。</p><p class="sm">它是${STAGE_N[g.stage]}，${phen(g.g).name}。可以摸摸它；${g.stage==='adult'?'它已经成年，也可以在「家族」里让它和你的兔子相亲。':'它还没成年，这次就一起玩吧。'}</p>`,
+    `<p><b>${esc(g.name)}</b> ${sexS(g)} 从<b>${esc(g.owner)}</b>家来玩了，会待${clamp(+c.h||VISIT_H,1,24)}小时。</p><p class="sm">可以喂它、摸摸它，它回家时会把你的照顾告诉主人。</p><p class="sm">它是${STAGE_N[g.stage]}，${phen(g.g).name}。可以摸摸它；${g.stage==='adult'?'它已经成年，也可以在「家族」里让它和你的兔子相亲。':'它还没成年，这次就一起玩吧。'}</p>`,
     traitHTML(g),
     `<p class="sm k">小游戏最高纪录</p>${rows}`],()=>toMain()));
   sndOk();return true;
@@ -1405,12 +1405,13 @@ function guestMenu(g){
   return menu(`${g.name}（${g.owner}家）`,()=>[
     {t:'看性格',on:()=>setScreen(profileScreen(g,()=>setScreen(guestMenu(g))))},
     {t:'摸摸它',on:()=>{toMain();pet(g);}},
+    {t:'喂它吃零食',s:TREATS[g.fav],dis:g.feedAt&&now()-g.feedAt<20*MIN?'刚吃过，等一下再喂':null,h:`它最爱吃${TREATS[g.fav]}`,on:()=>{g.feedAt=now();guestCare(g,'f');toMain();const v=vis(g);start(g,v,'eat',{item:g.fav});FX.push({k:'heart',x:v.x,y:v.y-18,life:1.2});cap(`${g.name}开心地吃着${TREATS[g.fav]}`,4);sndOk();save();}},
     {t:'一起去花园玩',s:mainR()?`${loveName(loveV(mainR(),g))} ${loveBar(loveV(mainR(),g))}`:'',dis:guestDateBlock(g),h:mainR()?(loveV(mainR(),g)>=LOVE_MATE?`它们相爱了，这次约会可能会交配`:`感情 ${Math.floor(loveV(mainR(),g))}/100：多一起玩，到${LOVE_MATE}才会想交配`):'',
       on:()=>setScreen(confirmScr('花园约会',`带${esc(mainR().name)}和${esc(g.name)}去花园玩？`,()=>guestDate(g),()=>setScreen(guestMenu(g))))},
     {t:'请它回家',on:()=>setScreen(confirmScr('请它回家',`${esc(g.name)}会提早回${esc(g.owner)}家。`,()=>{guestLeave(g);toMain();},()=>setScreen(guestMenu(g))))}
   ],back,`${ageText((g.leaveAt-now())/MIN)}后回家`);
 }
-function guestLeave(g){const i=S.rabbits.indexOf(g);if(i<0)return;S.rabbits.splice(i,1);VIS.delete(g.id);log(now(),`${g.name}回${g.owner}家了`);save();}
+function guestLeave(g){const i=S.rabbits.indexOf(g);if(i<0)return;try{sendBackReport(g,true);}catch(e){}S.rabbits.splice(i,1);VIS.delete(g.id);log(now(),`${g.name}回${g.owner}家了`);save();}
 function guestMate(g){
   const m=mainR(),t=now();const why=guestBlock(g);if(why){cap(why,4);sndNo();setScreen(guestMenu(g));return;}
   if(loveV(m,g)<LOVE_MATE){toMain();const va=vis(m),vb=vis(g);const mid=clamp((va.x+vb.x)/2,32,68);vb.y=va.y;goTo(m,va,mid-7,'look');goTo(g,vb,mid+7,'back');g.tryAt=t+30*MIN;cap(`${g.name}有点害羞，30分钟后再试试`,4);sndNo();save();return;}
@@ -2536,7 +2537,7 @@ function guestDateBlock(g){const m=mainR(),t=now();if(!m)return'现在没有兔�
   if(isAsleep(m,t))return`${m.name}在睡觉`;if(isAsleep(g,t))return`${g.name}在睡觉`;if(m.sick)return`${m.name}生病了`;if(g.dateAt&&t-g.dateAt<40*MIN)return`它们刚玩过，${ageText((g.dateAt+40*MIN-t)/MIN)}后再去`;return null;}
 function guestDate(g){
   const m=mainR(),t=now();const why=guestDateBlock(g);if(why){cap(why,4);sndNo();setScreen(guestMenu(g));return;}
-  g.dateAt=t;const v0=loveV(m,g),lv=loveLv(v0);
+  g.dateAt=t;guestCare(g,'d');const v0=loveV(m,g),lv=loveLv(v0);
   const mateWhy=v0<LOVE_MATE?null:guestBlock(g);const canMate=v0>=LOVE_MATE&&!mateWhy;
   if(canMate){guestMate(g);return;}
   const cf=.6+compat(m,g)/125;const v1=loveAdd(m,g,(8+ri(0,4))*cf);m.happy=Math.min(4,m.happy+1);affAdd(m,1);save();
@@ -2628,6 +2629,7 @@ function netInbox(d){
   for(const[id,m]of Object.entries(d)){if(!m||typeof m!=='object'||n.done.includes(id))continue;n.done.push(id);if(n.done.length>200)n.done.splice(0,n.done.length-200);
     api('DELETE','inbox/'+n.uid+'/'+id).catch(()=>{});
     if(m.k==='friend'){netAddFriendUid(m.from,{nick:m.nick,code:m.code},true);continue;}
+    if(m.k==='game'&&m.gid){if(!n.friends[m.from])netAddFriendUid(m.from,{nick:m.nick,code:m.code},true);n.inq.push({id,from:m.from,nick:String(m.nick||'朋友').slice(0,8),t:m.t||Date.now(),game:{gid:String(m.gid).slice(0,40),kind:m.kind}});added++;continue;}
     if(typeof m.c!=='string'||m.c.length>12000)continue;
     if(!n.friends[m.from])netAddFriendUid(m.from,{nick:m.nick,code:m.code},true);
     n.inq.push({id,from:m.from,nick:String(m.nick||'朋友').slice(0,8),c:m.c,t:m.t||Date.now()});added++;}
@@ -2724,6 +2726,10 @@ function recvODateR(c){
 // 收件匣
 const INBOX_N={visit:'要来你家串门',propose:'想求亲',odate:'想约你的兔子去花园玩',odateR:'回复了约会邀请',race:'下战书要赛跑',raceR:'寄来赛跑结果',gift:'送你一份礼物',kit:'送你一只兔子',mate:'寄来婚书',reply:'回复了求亲',dateR:'寄来约会照片'};
 function inboxScreen(it){
+  if(it.game)return{name:'pages',hint:()=>'B 加入 · C 这次不玩',A(){},tap(){},
+    B(){netS().inq=netS().inq.filter(x=>x.id!==it.id);save();sndClick();toMain();joinCarrot(it);},
+    C(){netS().inq=netS().inq.filter(x=>x.id!==it.id);save();api('PUT','games/'+it.game.gid+'/ready/'+netS().uid,false).catch(()=>{});sndClick();toMain();},
+    html(){return`<div class="panel" data-tap="1"><div class="ttl">🥕 好友约你玩<span>B 加入</span></div><div class="body"><p><b>${esc(it.nick)}</b>约你玩「抢胡萝卜」！</p><p class="sm">两只兔子在同一个画面抢掉下来的胡萝卜，30 秒定胜负。</p><p class="sm k">${clock(it.t)}</p></div></div>`;}};
   const r=readCode(it.c);const t=r.c?r.c.t:'';const who=r.c&&r.c.r&&r.c.r.nm?`的${r.c.r.nm}`:'';
   return{name:'pages',hint:()=>'B 打开 · C 稍后再看',A(){},tap(){},
     B(){netS().inq=netS().inq.filter(x=>x.id!==it.id);save();sndClick();toMain();NET.replyTo=it.from;receiveCode(it.c);if(mode==='main')NET.replyTo=null;},
@@ -2743,7 +2749,7 @@ function netFriendsMenu(){
     L.push(myCodeItem(()=>setScreen(netFriendsMenu())));
     L.push({t:'加好友',s:'输入好友码',dis:netOn()?null:'还没连上服务器',on:()=>setScreen(addFriendScreen())});
     for(const[fu,f]of Object.entries(n.friends)){const d=NET.live[fu];const cnt=d&&d.rb?Object.keys(d.rb).length:0;
-      L.push({t:f.nick,s:isFresh(d)?'在线':'离线',h:`${fmtCode(f.code)} · ${cnt}只兔子`,on:()=>setScreen(menu(f.nick,[{t:'看它的兔子',on:()=>setScreen(suitorMenu(true))},{t:'删除好友',on:()=>setScreen(confirmScr('删除好友',`把${esc(f.nick)}从好友里删除？`,()=>{delete n.friends[fu];netClose('f:'+fu);delete NET.live[fu];save();setScreen(netFriendsMenu());},()=>setScreen(netFriendsMenu())))}],()=>setScreen(netFriendsMenu())))});}
+      L.push({t:f.nick,s:isFresh(d)?'在线':'离线',h:`${fmtCode(f.code)} · ${cnt}只兔子`,on:()=>setScreen(menu(f.nick,[{t:'约它玩抢胡萝卜',s:isFresh(d)?'在线':'离线',dis:mpBlock()||(isFresh(d)?null:'好友现在不在线'),h:'两个人实时比赛抢胡萝卜',on:()=>inviteCarrot(fu)},{t:'送今天的礼物',s:giftedToday(fu)?'今天送过了':'每天一次',dis:giftedToday(fu)?'今天已经送过了，明天再送':null,on:()=>setScreen(dailyGiftMenu(fu))},{t:'看它的兔子',on:()=>setScreen(suitorMenu(true))},{t:'删除好友',on:()=>setScreen(confirmScr('删除好友',`把${esc(f.nick)}从好友里删除？`,()=>{delete n.friends[fu];netClose('f:'+fu);delete NET.live[fu];save();setScreen(netFriendsMenu());},()=>setScreen(netFriendsMenu())))}],()=>setScreen(netFriendsMenu())))});}
     return L;},back,NET.status==='online'?'已连线':NET.status==='connecting'?'连线中…':NET.status==='nocfg'?'未设定':'离线');
   M2.live=1;return M2;
 }
@@ -2752,7 +2758,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.24h';
+const GAME_VER='2026.10.25a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -2868,7 +2874,7 @@ function installScreen(back){
     html(){return`<div class="panel"><div class="ttl">放到手机桌面</div><div class="body"><div style="display:flex;gap:.5em;align-items:center;margin:.1em 0 .25em"><img src="icon-192.png" alt="" style="width:2.6em;height:2.6em;border-radius:22%;flex:none"><p class="sm" style="margin:0">点桌面图示就能玩，像真的电子鸡，也会自动更新。</p></div>${BIP?'':`<p class="sm" style="margin:.1em 0"><b>①</b>${steps[0]} <b>②</b>${steps[1]} <b>③</b>${steps[2]}</p>`}<ul>${this.opts().map((o,i)=>`<li class="${this.idx===i?'sel':''}" data-i="${i}">${o}</li>`).join('')}</ul></div></div>`;}};
 }
 function maybeInstallGuide(){
-  if(!IS_WEB||isStandalone())return;let seen=false;try{seen=!!localStorage.getItem('tuwo_inst_seen')||!!localStorage.getItem('tuwo_moved');}catch(e){}
+  if(!IS_WEB||isStandalone()||navigator.webdriver)return;let seen=false;try{seen=!!localStorage.getItem('tuwo_inst_seen')||!!localStorage.getItem('tuwo_moved');}catch(e){}
   if(seen)return;
   const back=()=>{if(!S.started)showStart();else{toMain();checkQueue();}};
   setTimeout(()=>{if(mode==='start'||mode==='main')setScreen(installScreen(back));},700);
@@ -2879,6 +2885,182 @@ function webInit(){
   try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});}catch(e){}
   try{if(localStorage.getItem('tuwo_moved')){localStorage.removeItem('tuwo_moved');setTimeout(()=>{const m=mainR();setScreen(pages('搬家完成！',[`<p>${m?`<b>${esc(m.name)}</b>`:'兔子'}已经搬过来了，进度全部都在。</p><p class="sm">最后一步：按 Chrome 右上角「⋮」→「加到主画面」，以后从桌面图示打开，就像 App 一样。</p>`],()=>toMain()));sndCute();},600);}}catch(e){}
   try{const v=localStorage.getItem('tuwo_ver');if(v&&v!==GAME_VER)setTimeout(()=>cap('游戏已经自动更新到新版本 ✨',4),1500);localStorage.setItem('tuwo_ver',GAME_VER);}catch(e){}
+}
+
+/* ================= 实时联机玩法：抢胡萝卜 · 兔子公园 · 住宿报告 · 每日礼物 ================= */
+const miniP=r=>({u:r.uid,nm:r.name,g:gStr(r.g),sd:r.seed,sx:r.sex,st:r.stage});
+const fakeMini=p=>({uid:p.u,name:p.nm,g:strG(p.g),seed:p.sd,sex:p.sx,stage:p.st,tr:{brave:50,active:50,cuddly:50,greedy:50,naughty:50,temper:50}});
+function friendNick(fu){return(netS().friends[fu]||{}).nick||'朋友';}
+function mpBlock(){const m=mainR(),t=now();if(!m||m.stage==='nest')return'现在没有兔子';if(!netOn())return'没有连上服务器';if(awayR(m))return`${m.name}不在家`;if(isAsleep(m,t))return`${m.name}在睡觉`;if(m.sick)return`${m.name}生病了`;return null;}
+
+/* ---------- 抢胡萝卜（两人实时对战） ---------- */
+const CARROT_T=30;
+function carrotItems(seed){const rnd=mulberry(seed>>>0);const L=[];let t=.4;while(t<CARROT_T-1.2){const k=rnd();const type=k<.1?'rock':k<.19?'gold':'carrot';L.push({t,x:8+Math.floor(rnd()*80),v:20+rnd()*16,type});t+=.42+rnd()*.32;}return L;}
+const CPTS={carrot:1,gold:3,rock:0};
+async function inviteCarrot(fu){
+  const why=mpBlock();if(why){cap(why,4);sndNo();return;}
+  const n=netS(),m=mainR();const gid='g'+rid()+rid();const seed=ri(1,2e9);
+  try{await api('PUT','games/'+gid+'/meta',{host:n.uid,guest:fu,seed,kind:'carrot',at:Date.now()});await api('PUT','games/'+gid+'/ready/'+n.uid,miniP(m));
+    await netSend(fu,'',{k:'game',gid,kind:'carrot'});}catch(e){cap('连不上服务器，等一下再试',4);sndNo();return;}
+  setScreen(carrotLobby(gid,true,fu));
+}
+function carrotLobby(gid,host,fu){
+  const n=netS();const L={name:'mp',t:0,data:null,started:false,gone:false,
+    hint(){return this.gone?'对方没有加入\n按 B 返回':`等${friendNick(fu)}加入…（${Math.max(0,60-Math.floor(this.t))}秒）\nC 取消`;},
+    A(){},B(){if(this.gone)this.C();},C(){netClose('g:'+gid);if(!this.started){api('PUT','games/'+gid+'/ready/'+n.uid,false).catch(()=>{});}toMain();},tap(){},
+    upd(dt){this.t+=dt;if(!this.gone&&this.t>60){this.gone=true;netClose('g:'+gid);renderStrip();}},
+    draw(){rect(0,0,W,H,'#a9cfe6');rect(0,46,W,18,'#8fbf6a');const m=mainR();if(m){const sp=rabbitSprite(m.g,m.seed,Math.floor(this.t*2)%2?'stand':'sit','open',{s:.8,hb:1,ef:1});drawSprite(sp,30,58,1);}
+      bm('carrot',60,40);const k=Math.floor(this.t*2)%4;for(let i=0;i<3;i++)rect(44+i*4,30,2,2,i<k?INK:'#7d9fc0');},
+    onData(d){this.data=d;if(!d||this.started)return;const meta=d.meta||{};const rd=d.ready||{};
+      if(rd[fu]===false){this.gone=true;renderStrip();cap(`${friendNick(fu)}这次不想玩`,4);netClose('g:'+gid);return;}
+      if(host&&rd[n.uid]&&rd[fu]&&!meta.go){api('PUT','games/'+gid+'/meta/go',{'.sv':'timestamp'}).catch(()=>{});}
+      if(meta.go&&rd[n.uid]&&rd[fu]){this.started=true;setScreen(carrotGame(gid,meta.seed,fu,rd[fu]));}}};
+  netStream('g:'+gid,'games/'+gid,d=>{if(M&&M.onData)M.onData(d);});
+  return L;
+}
+async function joinCarrot(it){
+  const why=mpBlock();const n=netS();const gid=it.game.gid;
+  if(why){api('PUT','games/'+gid+'/ready/'+n.uid,false).catch(()=>{});cap(why+'，没办法玩',4);sndNo();return;}
+  if(Date.now()-it.t>120000){cap(`${it.nick}之前约你玩，但已经过期了`,4);return;}
+  try{await api('PUT','games/'+gid+'/ready/'+n.uid,miniP(mainR()));}catch(e){cap('连不上服务器',4);return;}
+  setScreen(carrotLobby(gid,false,it.from));
+}
+function carrotGame(gid,seed,fu,oppP){
+  const n=netS(),me=n.uid,m=mainR();const items=carrotItems(seed);const opp=fakeMini(oppP);const spd=42+(m.tr.active-50)/5;
+  const G={name:'mp',t:-3,x:30,tx:30,ox:66,otx:66,stun:0,rh:0,orh:0,claims:{},pend:{},hitR:{},pushAt:0,oppAt:Date.now(),done:false,res:null,lastNote:'',
+    hint(){if(this.done)return this.res+'\n按 B 继续';if(this.t<0)return`准备……${Math.ceil(-this.t)}\n拖动兔子或按 A / C 左右移动`;const[a,b]=this.sc();return`${m.name} ${a} : ${b} ${opp.name}　剩${Math.max(0,Math.ceil(CARROT_T-this.t))}秒\nA 往左 · C 往右${this.lastNote?' · '+this.lastNote:''}`;},
+    sc(){let a=0,b=0;for(const[i,u]of Object.entries(this.claims)){const p=CPTS[items[i].type];if(u===me)a+=p;else b+=p;}return[Math.max(0,a-this.rh*2),Math.max(0,b-this.orh*2)];},
+    A(){if(!this.done)this.tx=Math.max(8,this.tx-16);},C(){if(!this.done)this.tx=Math.min(88,this.tx+16);else this.B();},B(){if(this.done){netClose('g:'+gid);toMain();checkQueue();}},
+    ptr(x,y,ph){if(!this.done)this.tx=clamp(x,8,88);},tap(){},
+    onData(d){if(!d)return;this.claims=Object.assign({},d.c||{});const op=d.p&&d.p[fu];if(op){this.otx=op.x;this.orh=op.rh||0;this.oppAt=Date.now();}},
+    claim(i){if(this.pend[i]||this.claims[i])return;this.pend[i]=1;api('PUT',`games/${gid}/c/${i}`,me).then(()=>{this.claims[i]=me;sndOk();}).catch(()=>{});},
+    upd(dt){this.t+=dt;if(this.done)return;
+      if(this.t>=0){if(this.stun>0)this.stun-=dt;else{const d=this.tx-this.x;this.x+=Math.sign(d)*Math.min(Math.abs(d),spd*dt);}}
+      this.ox+=(this.otx-this.ox)*Math.min(1,dt*8);
+      if(Date.now()-this.pushAt>200&&this.t>-1){this.pushAt=Date.now();api('PUT',`games/${gid}/p/${me}`,{x:Math.round(this.x),rh:this.rh,at:Date.now()}).catch(()=>{});}
+      for(let i=0;i<items.length;i++){const it=items[i];if(this.claims[i]||this.hitR[i])continue;const y=6+(this.t-it.t)*it.v;if(y<46||y>62)continue;
+        if(Math.abs(it.x-this.x)<9){if(it.type==='rock'){this.hitR[i]=1;this.rh++;this.stun=1;this.lastNote='被石头砸到了！';sndNo();}else this.claim(i);}}
+      if(this.t>=CARROT_T+1.2){this.finish();}},
+    finish(){this.done=true;const[a,b]=this.sc();const win=a>b,tie=a===b;
+      this.res=tie?`平手！${a} : ${b}`:win?`${m.name}赢了！${a} : ${b}`:`${opp.name}赢了 ${a} : ${b}`;
+      m.happy=Math.min(4,m.happy+(win?2:1));affAdd(m,win?2:1);loveAdd(m,opp,4);m.weight=Math.max(Math.round(IDEAL[m.stage]*.7),m.weight-30);m.care.plays++;dn(m,'games','抢胡萝卜');
+      S.best=S.best||{};if(a>(S.best.carrotmp||0))S.best.carrotmp=a;log(now(),`和${friendNick(fu)}家的${opp.name}玩抢胡萝卜，${tie?'平手':win?'赢了':'输了'}`);
+      if(win)firstTime(m,'carrotwin',`${m.name}抢胡萝卜赢了${opp.name}`,.3);save();renderStrip();win?sndOk():sndCute();},
+    draw(){const t=Math.max(0,this.t);rect(0,0,W,H,'#bfe0ef');for(let i=0;i<3;i++)bm('cloud',Math.round((i*40+t*4)%130)-20,3+i*3);
+      rect(0,50,W,14,'#8fbf6a');rect(0,50,W,1,'#5f9e45');for(let x=2;x<W;x+=9)rect(x,55+(x%3),1,2,'#5f9e45');
+      for(let i=0;i<items.length;i++){const it=items[i];if(this.claims[i]||this.hitR[i])continue;const y=Math.round(6+(this.t-it.t)*it.v);if(y<0||y>60)continue;
+        if(it.type==='rock')bm('rock',it.x-3,y-4);else if(it.type==='gold'){bm('carrot',it.x-3,y-2,'#e3b341');if(Math.floor(this.t*6)%2)rect(it.x+3,y-4,1,1,'#fff7b0');}else bm('carrot',it.x-3,y-2);}
+      const pose=(mv,st)=>st>0?'thump':mv?((this.t*3)%1<.6?'hop':'sit'):'sit';
+      const so=rabbitSprite(opp.g,opp.seed,pose(Math.abs(this.otx-this.ox)>1,0),'open',{s:.7,hb:1.1,ef:.9});drawSprite(so,Math.round(this.ox),61,this.otx<this.ox?-1:1,.75);
+      const sm=rabbitSprite(m.g,m.seed,pose(Math.abs(this.tx-this.x)>1,this.stun),'open',{s:.7,hb:1.1,ef:.9});drawSprite(sm,Math.round(this.x),61,this.tx<this.x?-1:1);
+      bm('arrow',Math.round(this.x)-2,30);
+      const[a,b]=this.sc();digits(String(a),2,1,INK);const sb=String(b);digits(sb,W-2-strW(sb),1,'#7d6a8a');const tl=String(Math.max(0,Math.ceil(CARROT_T-this.t)));digits(tl,48-Math.floor(strW(tl)/2),1,INK);
+      if(this.t<0){const c=String(Math.ceil(-this.t));digits2(c,48-strW(c),24,INK);}
+      if(Date.now()-this.oppAt>6000&&this.t>2&&!this.done)this.lastNote='对方好像断线了';
+      if(this.done){rect(0,0,W,H,'rgba(246,243,234,.4)');}}};
+  netStream('g:'+gid,'games/'+gid,d=>{if(M&&M.onData)M.onData(d);});
+  sndCute();return G;
+}
+
+/* ---------- 兔子公园（实时相遇） ---------- */
+function parkScreen(){
+  const why=mpBlock();if(why){cap(why,4);sndNo();return;}
+  const n=netS(),me=n.uid,m=mainR();const others={};const fx=[];const seen={};
+  for(const fu of Object.keys(n.friends).slice(0,15))netStream('p:'+fu,'park/'+fu,d=>{others[fu]=d;P.onPeer(fu,d);});
+  const P={name:'mp',t:0,x:30,tx:30,act:'',ev:null,evN:0,pushAt:0,cdC:0,cdN:0,note:'进公园了，等等看有没有好友',
+    live(){return Object.entries(others).filter(([fu,d])=>d&&d.r&&Date.now()-(d.at||0)<12000);},
+    near(){let best=null,bd=99;for(const[fu,d]of this.live()){const dx=Math.abs((d.dx??d.x)-this.x);if(dx<bd){bd=dx;best=[fu,d];}}return best?{fu:best[0],d:best[1],dist:bd}:null;},
+    hint(){const L=this.live();return`${L.length?`公园里有${L.length}位好友`:'公园里还没有好友'} · ${this.note}\nA 丢胡萝卜 · B 碰鼻子 · C 回家`;},
+    push(){this.pushAt=Date.now();api('PUT','park/'+me,{r:miniP(m),nick:S.nick||'兔主人',x:Math.round(this.x),act:this.act,ev:this.ev,at:{'.sv':'timestamp'}}).catch(()=>{});},
+    A(){const nb=this.near();if(!nb){this.note='附近没有好友的兔子';renderStrip();sndNo();return;}if(Date.now()<this.cdC){this.note='胡萝卜刚丢完，等一下';renderStrip();return;}
+      this.cdC=Date.now()+15000;this.ev={k:'carrot',to:nb.fu,id:++this.evN+'-'+Date.now()};fx.push({k:'carrot',x0:this.x,x1:nb.d.dx??nb.d.x,t:0});this.push();
+      const o=fakeMini(nb.d.r);loveAdd(m,o,1);this.note=`丢了胡萝卜给${o.name}`;renderStrip();sndClick();},
+    B(){const nb=this.near();if(nb&&nb.dist<20){if(Date.now()<this.cdN){this.note='刚碰过鼻子了';renderStrip();return;}this.cdN=Date.now()+30000;
+        this.tx=(nb.d.dx??nb.d.x)+((nb.d.dx??nb.d.x)>this.x?-10:10);this.ev={k:'nose',to:nb.fu,id:++this.evN+'-'+Date.now()};this.push();
+        const o=fakeMini(nb.d.r);loveAdd(m,o,1.5);fx.push({k:'hearts',x:(this.x+(nb.d.dx??nb.d.x))/2,t:0});this.note=`${m.name}和${o.name}碰了碰鼻子`;renderStrip();sndCute();firstTime(m,'parknose',`${m.name}在公园和${o.name}碰鼻子`,.6);save();}
+      else{this.act='binky';this.at2=0;this.push();sndClick();}},
+    C(){api('PUT','park/'+me,null).catch(()=>{});for(const fu of Object.keys(n.friends))netClose('p:'+fu);save();toMain();},
+    tapXY(x){this.tx=clamp(x,8,88);},ptr(x){this.tx=clamp(x,8,88);},
+    onPeer(fu,d){if(!d||!d.ev||d.ev.to!==me||seen[d.ev.id])return;seen[d.ev.id]=1;if(Date.now()-(d.at||0)>15000)return;const o=fakeMini(d.r);
+      if(d.ev.k==='nose'){loveAdd(m,o,1.5);fx.push({k:'hearts',x:(this.x+(d.dx??d.x))/2,t:0});this.note=`${o.name}跑来碰${m.name}的鼻子`;sndCute();}
+      else if(d.ev.k==='carrot'){loveAdd(m,o,1);fx.push({k:'carrot',x0:d.dx??d.x,x1:this.x,t:0,mine:1});this.note=`${friendNick(fu)}的${o.name}丢了胡萝卜给你！`;m.happy=Math.min(4,m.happy+1);sndOk();}
+      renderStrip();save();},
+    upd(dt){this.t+=dt;const d=this.tx-this.x;this.x+=Math.sign(d)*Math.min(Math.abs(d),30*dt);
+      if(Math.abs(d)>1&&this.act!=='walk'){this.act='walk';}else if(Math.abs(d)<=1&&this.act==='walk'){this.act='';this.push();}
+      if(Date.now()-this.pushAt>(this.act==='walk'?400:2000))this.push();
+      for(const[fu,o]of this.live()){if(o.dx==null)o.dx=o.x;o.dx+=(o.x-o.dx)*Math.min(1,dt*3);}
+      for(const f of fx)f.t+=dt;for(let i=fx.length-1;i>=0;i--)if(fx[i].t>2)fx.splice(i,1);
+      if(this.at2!=null){this.at2+=dt;if(this.at2>.9){this.at2=null;this.act='';}}},
+    draw(){const h=hourOf(now());SCENES.park.draw(0,this.t,h);W_LIGHTS=[];const night=isNightH(h);
+      const hop=(k,mv)=>mv?((this.t*2.6+k)%1<.65?'hop':'sit'):'sit';
+      for(const[fu,o]of this.live()){const r=fakeMini(o.r);const mv=Math.abs(o.x-o.dx)>1||o.act==='walk';const bk=o.act==='binky';
+        const sp=rabbitSprite(r.g,r.seed,bk?'hop':hop(.3,mv),'open',stageOpts({stage:r.stage}));drawSprite(sp,Math.round(o.dx),61-(bk?Math.round(Math.sin((this.t*3)%1*Math.PI)*6):0),o.x<o.dx?-1:1);}
+      const mv=this.act==='walk',bk=this.at2!=null;const sp=rabbitSprite(m.g,m.seed,bk?'hop':hop(0,mv),'open',stageOpts(m));drawSprite(sp,Math.round(this.x),61-(bk?Math.round(Math.sin(Math.min(1,this.at2/.9)*Math.PI)*8):0),this.tx<this.x?-1:1);
+      bm('arrow',Math.round(this.x)-2,26);
+      for(const f of fx){if(f.k==='hearts'){for(let i=0;i<3;i++)bm('heart',Math.round(f.x-6+i*5),Math.round(40-f.t*10-i*2),'#d9485a');}
+        else if(f.k==='carrot'){const p=Math.min(1,f.t/.8);const x=f.x0+(f.x1-f.x0)*p,y=46-Math.sin(p*Math.PI)*18;if(p<1)bm('carrot',Math.round(x)-3,Math.round(y));}}
+      if(night)rect(0,0,W,H,'rgba(20,24,44,.35)');
+      const c=clock(now());digits(c,W-1-strW(c),1,night?NIGHT_INK:INK);}};
+  P.push();setScreen(P);sndCute();
+}
+
+/* ---------- 每日礼物 ---------- */
+TREASURES.push(['badge','友情徽章',3,['.zzz.','zzrzz','zrrrz','zzrzz','.zzz.']]);BM.tr_badge=TREASURES[TREASURES.length-1][3];TRE.badge=TREASURES[TREASURES.length-1];
+function giftedToday(fu){const n=netS();n.gifted=n.gifted||{};return n.gifted[fu]===dayKey(now());}
+function dailyGiftMenu(fu){
+  const back=()=>setScreen(netFriendsMenu());const own=S.treasures||{};
+  const L=[{t:'一把新鲜苜蓿',s:'每天免费',h:'兔子最爱的小点心',on:()=>sendDGift(fu,null)}];
+  for(const x of TREASURES){if((own[x[0]]||0)>0&&x[0]!=='badge')L.push({t:x[1],s:`你有${own[x[0]]}个`,h:'送出去后你就少一个',on:()=>sendDGift(fu,x[0])});}
+  return menu(`送${friendNick(fu)}今天的礼物`,L,back,'每天一次');
+}
+function sendDGift(fu,id){
+  const n=netS();const today=dayKey(now());n.streak=n.streak||{};const s=n.streak[fu]||{d:'',c:0};
+  const y=dayKey(now()-1440*MIN);s.c=s.d===y?s.c+1:s.d===today?s.c:1;s.d=today;n.streak[fu]=s;
+  if(id){S.treasures[id]=Math.max(0,(S.treasures[id]||0)-1);}
+  n.gifted=n.gifted||{};n.gifted[fu]=today;const f=n.friends[fu];if(f)f.k=(f.k||0)+1;save();
+  const c=mkCode({t:'dgift',tid:id||'',streak:s.c});
+  netSend(fu,c).then(()=>{cap(`礼物送到${friendNick(fu)}家了！${s.c>=2?`已经连续送了${s.c}天`:''}`,4);sndOk();}).catch(()=>{cap('送不出去，等一下再试',4);sndNo();});
+  toMain();
+}
+function recvDGift(c){
+  const m=mainR();const from=String(c.n||'朋友').slice(0,8);const id=TRE[c.tid]&&c.tid!=='badge'?c.tid:null;
+  S.treasures=S.treasures||{};let extra='';
+  if(id){S.treasures[id]=(S.treasures[id]||0)+1;}else if(m){m.happy=Math.min(4,m.happy+1);if(m.hunger<4)m.hunger++;}
+  if((+c.streak||0)>=3&&!S.treasures.badge){S.treasures.badge=1;extra='\n连续收礼三天，得到了「友情徽章」！';}
+  log(now(),`${from}送来了${id?TRE[id][1]:'一把新鲜苜蓿'}`);toMain();
+  if(m){const v=vis(m);start(m,v,'binky');for(let i=0;i<3;i++)FX.push({k:'heart',x:v.x+ri(-5,5),y:v.y-20-i*4,life:1.4+i*.3});dn(m,'gift');}
+  cap(`🎁 ${from}送来了「${id?TRE[id][1]:'一把新鲜苜蓿'}」！${id?'（放进宝物盒了）':`${m?m.name+'吃得好开心':''}`}${extra}`,6);sndCute();save();return true;
+}
+
+/* ---------- 到好友家住 · 住宿报告 ---------- */
+function stayMenu(m){
+  return menu('到好友家住',[3,8,24].map(h=>({t:h===24?'住一天':`${h}小时`,s:h===3?'串门':'过夜',h:`${m.name}会去好友家住${h===24?'一天':h+'小时'}，好友可以喂它、陪它玩，回来会带住宿报告`,on:()=>sendVisitH(m,h)})),()=>setScreen(netMenu()));
+}
+function sendVisitH(m,h){
+  const why=visitBlock(m);if(why){cap(why,4);sndNo();return;}
+  setScreen(confirmScr('到好友家住',`${esc(m.name)}会马上出门，去好友家住${h===24?'一天':h+'小时'}，时间到自己回来。`,()=>{
+    const c=mkCode({t:'visit',r:packR(m),best:{...S.best},h});
+    const t=now();m.away={until:t+h*60*MIN,to:'朋友',at:t};VIS.delete(m.id);log(t,`${m.name}出门去好友家住了`);save();
+    setScreen(codeScreen('串门码',`把这段发给好友，${esc(m.name)}就会出现在他家，住${h===24?'一天':h+'小时'}后回来。`,c,`🐰 ${S.nick||'我'}家的${m.name}要去你家住${h===24?'一天':h+'小时'}！复制整段贴进口袋兔子：`,()=>toMain()));
+  },()=>setScreen(stayMenu(m))));
+}
+function guestCare(g,k){g.cr=g.cr||{p:0,f:0,d:0,g:0};g.cr[k]=(g.cr[k]||0)+1;}
+function sendBackReport(g,early){
+  if(!g||!g.ownerFu||!S.net||!S.net.uid)return;
+  const cr=g.cr||{p:0,f:0,d:0,g:0};const m=mainR();
+  const c=mkCode({t:'back',to:g.uid,cr,host:m?m.name:'',hrs:Math.round((now()-(g.arrAt||now()))/MIN/60*10)/10,early:early?1:0});
+  netAuth().then(()=>netSend(g.ownerFu,c)).catch(()=>{});
+}
+function recvBack(c){
+  const r=household().find(o=>o.uid===c.to);const from=String(c.n||'朋友').slice(0,8);
+  if(!r){cap('这份住宿报告是给别人家的兔子的',4);return false;}
+  const cr=c.cr||{};const t=now();
+  if(r.away){returnHome(r,t,false);}
+  const parts=[];if(cr.f)parts.push(`吃了${cr.f}次零食`);if(cr.p)parts.push(`被摸了${cr.p}次`);if(cr.d)parts.push(`去花园约会了${cr.d}次`);
+  const text=parts.length?parts.join('、'):'在那边安静地休息';
+  if(isMain(r)){r.happy=Math.min(4,r.happy+(parts.length?2:1));affAdd(r,1);dn(r,'adv',`${from}家`);}
+  log(t,`${r.name}在${from}家：${text}`);save();toMain();
+  setScreen(pages(`${r.name}的住宿报告`,[`<p><b>${esc(r.name)}</b>从<b>${esc(from)}</b>家回来了！</p><p class="sm">在那边${esc(text)}。${cr.p>=3?`看来${esc(from)}很疼它。`:''}</p>`],()=>toMain()));sndCute();return true;
 }
 
 /* ================= main loop ================= */
@@ -3000,7 +3182,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
