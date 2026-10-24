@@ -9,7 +9,8 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>口袋兔窝</title>
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>口袋兔子</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 /* Layout: one photographed lavender toy fills the phone (sides may bleed off-screen); the LCD, printed icons, label ticker and the three domes are overlaid at measured positions on the photo */
@@ -112,7 +113,7 @@ body{background:radial-gradient(ellipse 80% 60% at 50% 45%,var(--page-hi),transp
   <div class="stage" id="stage">
     <div class="device" id="dev">
       <div class="skin" aria-hidden="true"></div>
-      <div class="ov brand"><canvas id="logo" width="9" height="9" aria-hidden="true"></canvas>口袋兔窝</div>
+      <div class="ov brand"><canvas id="logo" width="9" height="9" aria-hidden="true"></canvas>口袋兔子</div>
       <div class="ov icons" id="icT"></div>
       <div class="ov lcd" id="lcd"><canvas id="scr"></canvas><div id="ui"></div><div class="glare" aria-hidden="true"></div></div>
       <div class="ov icons" id="icB"></div>
@@ -1174,6 +1175,7 @@ function bookMenu(){
     if(S.tut>=1&&S.tut<=5)L.push({t:'跳过教学',on:()=>{S.tut=-1;save();toMain();}});
     const m=mainR();if(m&&m.stage!=='nest'&&mainR()&&household().length>1)L.push({t:`${m.name}的名字`,s:'改名',on:()=>setScreen(renameScr(m,()=>setScreen(bookMenu())))});
     else if(m)L.push({t:'改名字',on:()=>setScreen(renameScr(m,()=>setScreen(bookMenu())))});
+    if(IS_WEB&&!isStandalone())L.push({t:'安装到桌面',s:'像 App 一样',on:()=>setScreen(installScreen(()=>setScreen(bookMenu())))});
     L.push({t:'搬家',s:IS_WEB?'存档转移':'搬到网址版',on:()=>setScreen(moveMenu())});
     L.push({t:'重置',s:'选错兔子时用',on:()=>setScreen(resetMenu())});
     return L;};
@@ -1231,7 +1233,7 @@ function awayScreen(ms,entries){
 function showStart(){
   setScreen({name:'start',idx:0,hint(){return this.idx===0?'按 B 开始':'按 B 把旧版的兔子搬过来\nA 切换';},A(){this.idx=1-this.idx;sndClick();renderUI();},
     B(){if(this.idx===1){sndClick();setScreen(importScreen(()=>showStart()));return;}sndOk();newLitter();toMain();checkQueue();},C(){},tap(i){if(i===0||i===1){this.idx=i;sndClick();renderUI();}},
-    html(){return`<div class="panel"><div class="ttl">口袋兔窝</div><div class="body"><p class="sm">邻居家的兔妈妈生了一窝宝宝，去挑一只带回家吧，每只的性格都不一样。</p><ul><li class="${this.idx===0?'sel':''}" data-i="0">开始</li><li class="${this.idx===1?'sel':''}" data-i="1">从旧版搬家（已经有兔子）</li></ul></div></div>`;}});
+    html(){return`<div class="panel"><div class="ttl">口袋兔子</div><div class="body"><p class="sm">邻居家的兔妈妈生了一窝宝宝，去挑一只带回家吧，每只的性格都不一样。</p><ul><li class="${this.idx===0?'sel':''}" data-i="0">开始</li><li class="${this.idx===1?'sel':''}" data-i="1">从旧版搬家（已经有兔子）</li></ul></div></div>`;}});
 }
 function successorScreen(){
   const ref=S.prevMain;
@@ -1317,12 +1319,12 @@ function nickScreen(){return{name:'rename',idx:0,hint(){return'输入名字后�
   html(){return`<div class="panel"><div class="ttl">我的名字</div><div class="body"><p><label for="nick">朋友会看到的名字（最多8个字）</label></p><input id="nick" maxlength="8" value="${esc(S.nick||'')}" autocomplete="off"></div></div>`;}};}
 function giftMenu(){
   const back=()=>setScreen(netMenu());
-  return menu('送礼物',Object.keys(GIFTS).map(k=>({t:GIFTS[k][0],s:'礼物',h:GIFTS[k][1],on:()=>{const c=mkCode({t:'gift',k});setScreen(codeScreen('礼物码',`把这段发给朋友，他的兔子就会收到「${GIFTS[k][0]}」。`,c,`🎁 ${S.nick||'我'}送你的兔子一份${GIFTS[k][0]}！复制整段贴进口袋兔窝：`,back));}})),back);
+  return menu('送礼物',Object.keys(GIFTS).map(k=>({t:GIFTS[k][0],s:'礼物',h:GIFTS[k][1],on:()=>{const c=mkCode({t:'gift',k});setScreen(codeScreen('礼物码',`把这段发给朋友，他的兔子就会收到「${GIFTS[k][0]}」。`,c,`🎁 ${S.nick||'我'}送你的兔子一份${GIFTS[k][0]}！复制整段贴进口袋兔子：`,back));}})),back);
 }
 function kitSendMenu(){
   const back=()=>setScreen(netMenu());
   return menu('送养兔宝宝',()=>{const L=household().filter(o=>!isMain(o)).map(o=>({t:`${o.name} ${sexS(o)}`,s:`${STAGE_N[o.stage]}`,h:`${o.name}：${titleP(o)}`,dis:o.stage==='nest'?'还在喝奶，不能送':o.preg?'怀孕的兔子不能送':o.id===(mainR()||{}).partner?'这是你兔子的伴侣':null,
-    on:()=>setScreen(confirmScr('送去朋友家',`生成宝宝码后，${esc(o.name)}会马上离开你家，等朋友贴上码就会出现在他家。<br>每个宝宝码只能用一次。`,()=>{const c=mkCode({t:'kit',r:packR(o)});S.rabbits.splice(S.rabbits.indexOf(o),1);histOf(o);S.hist[o.id].end=now();S.hist[o.id].cause='friend';VIS.delete(o.id);log(now(),`${o.name}被送去朋友家了`);save();setScreen(codeScreen('宝宝码',`把这段发给朋友，${esc(o.name)}就会搬去他家。`,c,`🐣 ${S.nick||'我'}送你一只兔子「${o.name}」！复制整段贴进口袋兔窝：`,()=>toMain()));},back))}));
+    on:()=>setScreen(confirmScr('送去朋友家',`生成宝宝码后，${esc(o.name)}会马上离开你家，等朋友贴上码就会出现在他家。<br>每个宝宝码只能用一次。`,()=>{const c=mkCode({t:'kit',r:packR(o)});S.rabbits.splice(S.rabbits.indexOf(o),1);histOf(o);S.hist[o.id].end=now();S.hist[o.id].cause='friend';VIS.delete(o.id);log(now(),`${o.name}被送去朋友家了`);save();setScreen(codeScreen('宝宝码',`把这段发给朋友，${esc(o.name)}就会搬去他家。`,c,`🐣 ${S.nick||'我'}送你一只兔子「${o.name}」！复制整段贴进口袋兔子：`,()=>toMain()));},back))}));
     return L.length?L:[{t:'家里没有可以送的兔子',dis:'只有你自己的兔子在家',on:()=>{}}];},back);
 }
 function pasteScreen(){return{name:'paste',hint(){return'长按框框贴上朋友的码，再按 B 读取\nC 返回';},A(){},
@@ -1418,10 +1420,10 @@ function guestMate(g){
     m.preg={at:t,dad:g.id,dadG:JSON.parse(JSON.stringify(g.g)),dadGen:g.gen,dadP:{tr:{...g.tr},quirk:g.quirk,fav:g.fav},dadUid:g.uid,dadAnc:g.ancU||[]};
     log(t,`${m.name}和${g.owner}家的${g.name}有宝宝了`);save();
     const c=mkCode({t:'dateR',ds,a:packR(m),b:packR(g),to:g.uid});
-    setScreen(dateScreen(dateP(m),dateP(g),ds,`${m.name}怀上了${g.name}的宝宝！`,()=>setScreen(codeScreen('约会码',`${esc(m.name)}怀上了${esc(g.name)}的宝宝，大约24小时后出生！<br>把约会码发给${esc(g.owner)}，他也能看到这场花园约会。`,c,`💕 ${S.nick||'我'}家的${m.name}和你家的${g.name}在花园约会了！复制整段贴进口袋兔窝：`,()=>toMain()))));
+    setScreen(dateScreen(dateP(m),dateP(g),ds,`${m.name}怀上了${g.name}的宝宝！`,()=>setScreen(codeScreen('约会码',`${esc(m.name)}怀上了${esc(g.name)}的宝宝，大约24小时后出生！<br>把约会码发给${esc(g.owner)}，他也能看到这场花园约会。`,c,`💕 ${S.nick||'我'}家的${m.name}和你家的${g.name}在花园约会了！复制整段贴进口袋兔子：`,()=>toMain()))));
   }else{
     const c=mkCode({t:'mate',target:g.uid,r:packR(m),ds});log(t,`${m.name}和${g.owner}家的${g.name}相亲成功`);save();
-    setScreen(dateScreen(dateP(m),dateP(g),ds,`${m.name}和${g.name}约会成功！`,()=>setScreen(codeScreen('婚书码',`相亲成功！把这段发给${esc(g.owner)}，${esc(g.name)}就会在他家生下${esc(m.name)}的宝宝。`,c,`💕 ${S.nick||'我'}家的${m.name}和你家的${g.name}相亲成功了！复制整段贴进口袋兔窝：`,()=>toMain()))));
+    setScreen(dateScreen(dateP(m),dateP(g),ds,`${m.name}和${g.name}约会成功！`,()=>setScreen(codeScreen('婚书码',`相亲成功！把这段发给${esc(g.owner)}，${esc(g.name)}就会在他家生下${esc(m.name)}的宝宝。`,c,`💕 ${S.nick||'我'}家的${m.name}和你家的${g.name}相亲成功了！复制整段贴进口袋兔子：`,()=>toMain()))));
   }
 }
 
@@ -2266,7 +2268,7 @@ function sendVisit(m){
   setScreen(confirmScr('去朋友家串门',`${esc(m.name)}会马上出门，去朋友家玩${VISIT_H}小时，时间到自己回来。`,()=>{
     const to=S.nick?'朋友':'朋友';const c=mkCode({t:'visit',r:packR(m),best:{...S.best}});
     const t=now();m.away={until:t+VISIT_H*60*MIN,to:'朋友',at:t};VIS.delete(m.id);log(t,`${m.name}出门去朋友家串门了`);save();
-    setScreen(codeScreen('串门码',`把这段发给朋友，${esc(m.name)}就会出现在他家，玩${VISIT_H}小时后回来。`,c,`🐰 ${S.nick||'我'}家的${m.name}要来你家串门！复制整段贴进口袋兔窝：`,()=>toMain()));
+    setScreen(codeScreen('串门码',`把这段发给朋友，${esc(m.name)}就会出现在他家，玩${VISIT_H}小时后回来。`,c,`🐰 ${S.nick||'我'}家的${m.name}要来你家串门！复制整段贴进口袋兔子：`,()=>toMain()));
   },()=>setScreen(netMenu())));
 }
 function visitBlock(m){if(!m||m.stage==='nest')return'现在没有可以出门的兔子';if(m.away)return`${m.name}已经出门了`;if(sitOn())return'兔子们在邻居家';if(m.sick)return`${m.name}生病了，在家休息吧`;if(m.preg)return`${m.name}怀孕了，别让它出远门`;if(isAsleep(m,now()))return`${m.name}在睡觉`;return null;}
@@ -2315,7 +2317,7 @@ function proposeBlock(r){
 function sendPropose(k,r){
   const m=mainR(),f=S.friends[k];const c=mkCode({t:'propose',target:r.uid,tn:r.name,r:packR(m)});
   S.props=S.props||{};S.props[r.uid]={at:now(),mid:m.uid};log(now(),`${m.name}向${f.n}家的${r.name}求亲了`);save();
-  setScreen(codeScreen('求亲码',`把这段发给${esc(f.n)}。他贴上之后，会决定${esc(r.name)}答不答应。<br>答应的话：${m.sex==='f'?`他会回你一个婚书码，宝宝在你家出生`:`宝宝会在${esc(f.n)}家出生`}。`,c,`💌 ${S.nick||'我'}家的${m.name}想向你家的${r.name}求亲！复制整段贴进口袋兔窝：`,()=>toMain()));
+  setScreen(codeScreen('求亲码',`把这段发给${esc(f.n)}。他贴上之后，会决定${esc(r.name)}答不答应。<br>答应的话：${m.sex==='f'?`他会回你一个婚书码，宝宝在你家出生`:`宝宝会在${esc(f.n)}家出生`}。`,c,`💌 ${S.nick||'我'}家的${m.name}想向你家的${r.name}求亲！复制整段贴进口袋兔子：`,()=>toMain()));
 }
 function recvPropose(c){
   const f=household().find(o=>o.uid===c.target);const d=unpackR(c.r);if(!d){cap('这个求亲码读不出来',4);sndNo();return false;}
@@ -2325,12 +2327,12 @@ function recvPropose(c){
   const decide=ok=>{
     if(ok&&why){cap(why,4);sndNo();return;}
     const t=now();
-    if(!ok){const rc=mkCode({t:'reply',ok:0,to:d.uid,r:packR(f)});log(t,`${f.name}婉拒了${from}家${d.name}的求亲`);save();setScreen(codeScreen('回信码',`把这段发给${esc(from)}，告诉他这次没缘分。`,rc,`💌 关于${d.name}的求亲……复制整段贴进口袋兔窝：`,()=>toMain()));return;}
+    if(!ok){const rc=mkCode({t:'reply',ok:0,to:d.uid,r:packR(f)});log(t,`${f.name}婉拒了${from}家${d.name}的求亲`);save();setScreen(codeScreen('回信码',`把这段发给${esc(from)}，告诉他这次没缘分。`,rc,`💌 关于${d.name}的求亲……复制整段贴进口袋兔子：`,()=>toMain()));return;}
     const ds=ri(1,2e9);
     if(f.sex==='f'){impregnate(f,d,from);const rc=mkCode({t:'reply',ok:1,to:d.uid,r:packR(f),ds});save();
-      setScreen(dateScreen(dateP(f),fakeR2(d),ds,`${f.name}怀上了${d.name}的宝宝！`,()=>setScreen(codeScreen('喜帖码',`${esc(f.name)}答应了，怀上了${esc(d.name)}的宝宝！把喜帖码发给${esc(from)}，告诉他好消息。`,rc,`💕 ${f.name}答应了${d.name}的求亲！复制整段贴进口袋兔窝：`,()=>toMain()))));}
+      setScreen(dateScreen(dateP(f),fakeR2(d),ds,`${f.name}怀上了${d.name}的宝宝！`,()=>setScreen(codeScreen('喜帖码',`${esc(f.name)}答应了，怀上了${esc(d.name)}的宝宝！把喜帖码发给${esc(from)}，告诉他好消息。`,rc,`💕 ${f.name}答应了${d.name}的求亲！复制整段贴进口袋兔子：`,()=>toMain()))));}
     else{const mc=mkCode({t:'mate',target:d.uid,r:packR(f),ds});log(t,`${f.name}答应了${from}家${d.name}的求亲`);save();
-      setScreen(dateScreen(fakeR2(d),dateP(f),ds,`${f.name}和${d.name}约会成功！`,()=>setScreen(codeScreen('婚书码',`${esc(f.name)}答应了！把婚书码发给${esc(from)}，${esc(d.name)}就会在他家怀上宝宝。`,mc,`💕 ${f.name}答应了${d.name}的求亲！复制整段贴进口袋兔窝：`,()=>toMain()))));}
+      setScreen(dateScreen(fakeR2(d),dateP(f),ds,`${f.name}和${d.name}约会成功！`,()=>setScreen(codeScreen('婚书码',`${esc(f.name)}答应了！把婚书码发给${esc(from)}，${esc(d.name)}就会在他家怀上宝宝。`,mc,`💕 ${f.name}答应了${d.name}的求亲！复制整段贴进口袋兔子：`,()=>toMain()))));}
     sndOk();
   };
   const fr=friendOf(c);friendSaw(fr,c.r);
@@ -2362,7 +2364,7 @@ function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1
 function raceBlock(){const m=mainR();if(!m||m.stage==='nest')return'现在没有兔子';if(awayR(m))return`${m.name}不在家`;if(m.stage==='kit')return`${m.name}还太小，长大一点再比`;if(m.sick)return`${m.name}生病了`;if(m.preg)return`${m.name}怀孕了，不能跑`;return null;}
 function sendRace(){
   const why=raceBlock();if(why){cap(why,4);sndNo();return;}const m=mainR();const seed=ri(1,2e9);
-  const c=mkCode({t:'race',seed,r:packR(m)});setScreen(codeScreen('赛跑挑战码',`把这段发给朋友。他贴上之后，${esc(m.name)}会和他的兔子比赛跑；他会回你一个赛果码，你也能看到整场比赛。`,c,`🏁 ${S.nick||'我'}家的${m.name}向你的兔子下战书，来比赛跑！复制整段贴进口袋兔窝：`,()=>setScreen(netMenu())));
+  const c=mkCode({t:'race',seed,r:packR(m)});setScreen(codeScreen('赛跑挑战码',`把这段发给朋友。他贴上之后，${esc(m.name)}会和他的兔子比赛跑；他会回你一个赛果码，你也能看到整场比赛。`,c,`🏁 ${S.nick||'我'}家的${m.name}向你的兔子下战书，来比赛跑！复制整段贴进口袋兔子：`,()=>setScreen(netMenu())));
 }
 const RACE_LEN=80;
 function simRace(seed,A,B){
@@ -2417,7 +2419,7 @@ function recvRace(c){
     const won=R.win===1;f.k=(f.k||0)+1;if(won){f.w=(f.w||0)+1;m.happy=Math.min(4,m.happy+1);affAdd(m,2);}else{f.l=(f.l||0)+1;affAdd(m,1);}
     log(now(),`${m.name}和${from}家的${A.nm}赛跑，${won?'赢了！':'输了'}`);dn(m,'games','赛跑');if(won)firstTime(m,'racewin',`${m.name}赛跑赢了${from}家的${A.nm}`,.5);save();
     const rc=mkCode({t:'raceR',seed:c.seed,a:A,b:B});
-    setScreen(codeScreen('赛果码',`${won?`${esc(m.name)}赢了！`:`${esc(A.nm)}赢了，${esc(m.name)}下次加油`}<br>把赛果码发给${esc(from)}，他也能看到整场比赛。`,rc,`🏁 ${m.name} vs ${A.nm} 的比赛结果出炉！复制整段贴进口袋兔窝看重播：`,()=>toMain()));
+    setScreen(codeScreen('赛果码',`${won?`${esc(m.name)}赢了！`:`${esc(A.nm)}赢了，${esc(m.name)}下次加油`}<br>把赛果码发给${esc(from)}，他也能看到整场比赛。`,rc,`🏁 ${m.name} vs ${A.nm} 的比赛结果出炉！复制整段贴进口袋兔子看重播：`,()=>toMain()));
   }));return true;
 }
 function recvRaceR(c){
@@ -2733,7 +2735,7 @@ function netCheckInbox(){const n=netS();const it=n.inq.find(x=>!x.snooze||x.snoo
   if(r.c&&INBOX_AUTO.includes(r.c.t)){n.inq=n.inq.filter(x=>x.id!==it.id);save();toMain();NET.replyTo=it.from;receiveCode(it.c);if(mode==='main')NET.replyTo=null;return true;}
   setScreen(inboxScreen(it));sndCute();return true;}
 // 选单
-function myCodeScreen(back){const n=netS();return codeScreen('我的好友码',`<b style="font-size:1.7em;letter-spacing:.06em">${fmtCode(n.code)}</b><br>朋友在「家族 → 好友 → 加好友」输入这个码`,fmtCode(n.code),`🐰 加我口袋兔窝的好友！我的好友码：`,back,true);}
+function myCodeScreen(back){const n=netS();return codeScreen('我的好友码',`<b style="font-size:1.7em;letter-spacing:.06em">${fmtCode(n.code)}</b><br>朋友在「家族 → 好友 → 加好友」输入这个码`,fmtCode(n.code),`🐰 来玩口袋兔子，加我好友！\n游戏网址：${WEB_URL}\n（用 Chrome 打开，按「⋮ → 加到主画面」）\n我的好友码：`,back,true);}
 function myCodeItem(back){const n=netS();return{t:'我的好友码',s:n.code?fmtCode(n.code):NET.status==='nocfg'?'服务器未设定':'连线中…',h:'把这个码给朋友，他加了你，双方就能实时看到对方的兔子',dis:n.code?null:(NET.status==='nocfg'?'联机服务器还没设定':'还没连上服务器，等一下再看'),on:()=>setScreen(myCodeScreen(back))};}
 function netFriendsMenu(){
   const back=()=>setScreen(netMenu());
@@ -2750,7 +2752,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.24d';
+const GAME_VER='2026.10.24e';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -2770,7 +2772,7 @@ function moveMenu(back){
   return menu('搬家（存档转移）',[
     ...(IS_WEB?[]:[{t:'一键搬到网址版',s:'推荐',h:'按一下就把兔子带到网址版，以后自动更新',on:()=>setScreen(moveWebScreen())}]),
     {t:'把存档搬出去',s:'生成存档码',h:'把这只兔子和全部进度变成一段存档码，再贴到新地方',on:async()=>{const c=await exportSave();const m=mainR();
-      setScreen(codeScreen('存档码',`这段存档码包含${m?esc(m.name)+'和':''}全部进度（${Math.round(c.length/1024)}KB）。<br>复制后，打开新网址版，在开始画面选「从旧版搬家」贴上。`,c,'口袋兔窝存档码：',back,true));}},
+      setScreen(codeScreen('存档码',`这段存档码包含${m?esc(m.name)+'和':''}全部进度（${Math.round(c.length/1024)}KB）。<br>复制后，打开新网址版，在开始画面选「从旧版搬家」贴上。`,c,'口袋兔子存档码：',back,true));}},
     {t:'把存档搬进来',s:'贴上存档码',h:'用旧版生成的存档码，把兔子搬到这里（会取代这里现在的进度）',on:()=>setScreen(importScreen(back))},
     ...(IS_WEB?[]:[{t:'新网址版',s:'自动更新',h:WEB_URL.replace('https://',''),on:()=>setScreen(pages('新网址版',[`<p>以后玩这个网址，我更新游戏你不用再下载：</p><p><b style="word-break:break-all">${WEB_URL}</b></p><p class="sm">用手机 Chrome 打开后，按右上角「⋮」→「加到主画面」，就会像 App 一样有图示。</p><p class="sm">先在这里「把存档搬出去」，再到新网址「从旧版搬家」贴上，兔子就跟着过去了。</p>`],back))}])
   ],back);
@@ -2791,9 +2793,9 @@ async function moveToWeb(){
 function moveWebScreen(){return{name:'pages',idx:0,hint(){return this.idx===0?'按 B 把兔子带到网址版':'按 B 先不要，以后在「兔谱 → 搬家」也能搬\nA 切换';},
   A(){this.idx=1-this.idx;sndClick();renderUI();},tap(i){if(i===0||i===1){this.idx=i;sndClick();renderUI();}},
   B(){if(this.idx===1){S.moveAsk=Date.now();save();sndClick();toMain();return;}sndOk();cap('搬家中……',3);setTimeout(moveToWeb,200);},C(){S.moveAsk=Date.now();save();sndClick();toMain();},
-  html(){const m=mainR();return`<div class="panel"><div class="ttl">口袋兔窝搬家了！</div><div class="body"><p class="sm">以后玩网址版，我更新游戏你不用再下载。${m?`按一下就把<b>${esc(m.name)}</b>和全部进度带过去：`:''}</p><ul><li class="${this.idx===0?'sel':''}" data-i="0">现在搬过去</li><li class="${this.idx===1?'sel':''}" data-i="1">以后再说</li></ul></div></div>`;}};}
+  html(){const m=mainR();return`<div class="panel"><div class="ttl">口袋兔子搬家了！</div><div class="body"><p class="sm">以后玩网址版，我更新游戏你不用再下载。${m?`按一下就把<b>${esc(m.name)}</b>和全部进度带过去：`:''}</p><ul><li class="${this.idx===0?'sel':''}" data-i="0">现在搬过去</li><li class="${this.idx===1?'sel':''}" data-i="1">以后再说</li></ul></div></div>`;}};}
 function movedScreen(){return{name:'pages',hint:()=>'按 B 再打开网址版',A(){},tap(){},C(){toMain();},B(){location.href=WEB_URL;},
-  html(){return`<div class="panel" data-tap="1"><div class="ttl">已经搬到网址版了</div><div class="body"><p class="sm">你的兔子现在住在网址版里，这个旧文件不会再更新了。</p><p class="sm">请从手机桌面的「口袋兔窝」图示打开；还没加到主画面的话，按 B 打开网址版，再按 Chrome 的「⋮ → 加到主画面」。</p></div></div>`;}};}
+  html(){return`<div class="panel" data-tap="1"><div class="ttl">已经搬到网址版了</div><div class="body"><p class="sm">你的兔子现在住在网址版里，这个旧文件不会再更新了。</p><p class="sm">请从手机桌面的「口袋兔子」图示打开；还没加到主画面的话，按 B 打开网址版，再按 Chrome 的「⋮ → 加到主画面」。</p></div></div>`;}};}
 // 网址版收到 #save= 时自动搬进来
 async function webReceive(){
   if(!IS_WEB)return;const h=location.hash||'';if(!h.startsWith('#save='))return;
@@ -2803,6 +2805,35 @@ async function webReceive(){
   const doIt=()=>{try{localStorage.setItem(KEY,JSON.stringify(o));localStorage.setItem('tuwo_moved','1');}catch(e){cap('存不进去：手机空间不足',5);return;}window.__noSave=true;location.reload();};
   if(!S.started||!mainR()){doIt();return;}
   setScreen(confirmScr('搬家',`要把旧版的${mm?`<b>${esc(mm.name)}</b>和`:''}${o.rabbits.length}只兔子搬进来吗？<br><b>这里现在的进度会被取代。</b>`,doIt,()=>toMain()));
+}
+// 安装到桌面
+let BIP=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();BIP=e;if(M&&M.inst)renderUI();});
+window.addEventListener('appinstalled',()=>{BIP=null;try{localStorage.setItem('tuwo_inst','1');}catch(e){}cap('安装好了！以后从手机桌面的「口袋兔子」图示打开',6);sndCute();});
+const isStandalone=()=>{try{return matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true;}catch(e){return false;}};
+const IS_IOS=/iphone|ipad|ipod/i.test(navigator.userAgent);const IS_SAMSUNG=/SamsungBrowser/i.test(navigator.userAgent);
+function installSteps(){
+  if(IS_IOS)return['下方「分享」','「加入主画面」','「新增」'];
+  if(IS_SAMSUNG)return['下方「≡」','「加至 → 主屏幕」','「添加」'];
+  return['右上角「⋮」','「加到主画面」','「安装」'];
+}
+function installScreen(back){
+  const steps=installSteps();
+  return{name:'pages',inst:1,idx:0,
+    opts(){return BIP?['一键安装到桌面','以后再说']:['知道了'];},
+    hint(){return BIP?(this.idx===0?'按 B 安装到桌面\nA 切换 · C 以后再说':'A 切换 · B 确定'):'照上面的步骤用浏览器装好\n按 B 继续 · C 以后再说';},
+    A(){if(this.opts().length>1){this.idx=1-this.idx;sndClick();renderUI();}},tap(i){if(i>=0&&i<this.opts().length){this.idx=i;sndClick();renderUI();}},
+    B(){try{localStorage.setItem('tuwo_inst_seen','1');}catch(e){}
+      if(this.idx===0&&BIP){const p=BIP;BIP=null;p.prompt();p.userChoice&&p.userChoice.then(c=>{if(c&&c.outcome!=='accepted')cap('没关系，之后在「兔谱 → 安装到桌面」也能装',5);});sndOk();back();return;}
+      sndClick();back();},
+    C(){try{localStorage.setItem('tuwo_inst_seen','1');}catch(e){}sndClick();back();},
+    html(){return`<div class="panel"><div class="ttl">放到手机桌面</div><div class="body"><div style="display:flex;gap:.5em;align-items:center;margin:.1em 0 .25em"><img src="icon-192.png" alt="" style="width:2.6em;height:2.6em;border-radius:22%;flex:none"><p class="sm" style="margin:0">点桌面图示就能玩，像真的电子鸡，也会自动更新。</p></div>${BIP?'':`<p class="sm" style="margin:.1em 0"><b>①</b>${steps[0]} <b>②</b>${steps[1]} <b>③</b>${steps[2]}</p>`}<ul>${this.opts().map((o,i)=>`<li class="${this.idx===i?'sel':''}" data-i="${i}">${o}</li>`).join('')}</ul></div></div>`;}};
+}
+function maybeInstallGuide(){
+  if(!IS_WEB||isStandalone())return;let seen=false;try{seen=!!localStorage.getItem('tuwo_inst_seen')||!!localStorage.getItem('tuwo_moved');}catch(e){}
+  if(seen)return;
+  const back=()=>{if(!S.started)showStart();else{toMain();checkQueue();}};
+  setTimeout(()=>{if(mode==='start'||mode==='main')setScreen(installScreen(back));},700);
 }
 // 网址版：注册离线快取，并在更新后提示一次
 function webInit(){
@@ -2845,7 +2876,7 @@ function frame(ts){
   LIVE_FRAME=false;
   flushSnaps();
   blit();
-  if(Math.floor(ts/250)!==Math.floor((ts-dt*1000)/250)){renderStrip();paintIcons();paintTick();const tt=anyCall()?'(!) 口袋兔窝':'口袋兔窝';if(tt!==lastTitle){document.title=tt;lastTitle=tt;}}
+  if(Math.floor(ts/250)!==Math.floor((ts-dt*1000)/250)){renderStrip();paintIcons();paintTick();const tt=anyCall()?'(!) 口袋兔子':'口袋兔子';if(tt!==lastTitle){document.title=tt;lastTitle=tt;}}
   requestAnimationFrame(frame);
 }
 
@@ -2929,10 +2960,10 @@ function boot(){
   requestAnimationFrame(frame);
 }
 boot();
-try{webInit();webReceive();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
+try{webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
