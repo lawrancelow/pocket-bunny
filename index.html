@@ -2752,7 +2752,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.24g';
+const GAME_VER='2026.10.24h';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -2777,10 +2777,33 @@ function moveMenu(back){
     ...(IS_WEB?[]:[{t:'新网址版',s:'自动更新',h:WEB_URL.replace('https://',''),on:()=>setScreen(pages('新网址版',[`<p>以后玩这个网址，我更新游戏你不用再下载：</p><p><b style="word-break:break-all">${WEB_URL}</b></p><p class="sm">用手机 Chrome 打开后，按右上角「⋮」→「加到主画面」，就会像 App 一样有图示。</p><p class="sm">先在这里「把存档搬出去」，再到新网址「从旧版搬家」贴上，兔子就跟着过去了。</p>`],back))}])
   ],back);
 }
-function haveRabbitScreen(){return{name:'pages',idx:0,opts:['我有存档码','回去'],
-  hint(){return this.idx===0?'按 B 贴上存档码':'按 B 回到开始画面';},A(){this.idx=1-this.idx;sndClick();renderUI();},tap(i){if(i===0||i===1){this.idx=i;sndClick();renderUI();}},
-  B(){sndClick();if(this.idx===0)setScreen(importScreen(()=>setScreen(haveRabbitScreen())));else showStart();},C(){sndClick();showStart();},
-  html(){return`<div class="panel"><div class="ttl">把兔子带过来</div><div class="body"><p class="sm">用手机打开<b>最新下载</b>的 pocket_bunny.html 文件就好，它会自动把兔子搬过来，什么都不用按。</p><p class="sm k">文件名有 (1)、(2) 的话，打开数字最大的那个。</p><ul>${this.opts.map((o,i)=>`<li class="${this.idx===i?'sel':''}" data-i="${i}">${o}</li>`).join('')}</ul></div></div>`;}};}
+function haveRabbitScreen(){return{name:'pages',idx:0,opts:['用旧的好友码找回','我有存档码','回去'],
+  hint(){return['按 B 输入旧版的好友码','按 B 贴上存档码','按 B 回到开始画面'][this.idx]+'\nA 切换';},A(){this.idx=(this.idx+1)%3;sndClick();renderUI();},tap(i){if(i>=0&&i<3){this.idx=i;sndClick();renderUI();}},
+  B(){sndClick();if(this.idx===0)setScreen(recoverScreen());else if(this.idx===1)setScreen(importScreen(()=>setScreen(haveRabbitScreen())));else showStart();},C(){sndClick();showStart();},
+  html(){return`<div class="panel"><div class="ttl">把兔子带过来</div><div class="body"><p class="sm">旧版「家族」第一项有你的好友码（TU-开头），输入它就能找回兔子。</p><ul>${this.opts.map((o,i)=>`<li class="${this.idx===i?'sel':''}" data-i="${i}">${o}</li>`).join('')}</ul></div></div>`;}};}
+// 用旧版的好友码，从服务器找回兔子（旧版连过线就会有记录）
+function recoverScreen(){return{name:'rename',idx:0,hint(){return'输入旧版的好友码，按 B 找回 · C 返回';},A(){},tap(){},C(){sndClick();setScreen(haveRabbitScreen());},
+  B(){const inp=ui.querySelector('input');recoverByCode(inp?inp.value:'');},
+  html(){return`<div class="panel"><div class="ttl">用旧好友码找回</div><div class="body"><p><label for="rcode">旧版的好友码（TU- 后面6个字）</label></p><input id="rcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"><p class="sm k">兔子、性格、年纪、毛色、感情都会回来；相册和宝物盒留在旧版。</p></div></div>`;}};}
+async function recoverByCode(raw){
+  const code=normCode(raw);if(code.length!==6){cap('好友码是 TU- 后面6个字',4);sndNo();return;}
+  if(!netOn()){cap('要连上网络才能找回，等一下再试',4);sndNo();netStart();return;}
+  let pl=null;try{const fu=await api('GET','codes/'+code);if(fu)pl=await api('GET','players/'+fu);}catch(e){cap('连不上服务器，等一下再试',4);sndNo();return;}
+  const L=pl&&pl.rb?Object.values(pl.rb).filter(e=>e&&e.p&&unpackR(e.p)):[];
+  if(!L.length){cap('找不到这个好友码的兔子，请再确认一次',5);sndNo();return;}
+  const main=L.find(e=>e.s&&e.s.mn)||L[0];const names=L.map(e=>e.p.nm).join('、');
+  setScreen(confirmScr('找回兔子',`找到了：<b>${esc(names)}</b><br>（${esc(String(pl.nick||'兔主人'))}，${new Date(pl.at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 的记录）<br>要把它们带回来吗？`,()=>{
+    const keepNet=S.net,nick=S.nick||pl.nick||'';const t=now();const passed=Math.max(0,(Date.now()-(pl.at||Date.now()))/MIN);
+    S=fresh();S.net=keepNet;S.nick=nick;S.started=true;S.tut=-1;S.firstPlay=Date.now();
+    let mr=null;
+    for(const e of L){const p=unpackR(e.p);const ageMin=p.age+passed;
+      const r=newRabbit({g:p.g,sex:p.sex,born:t-ageMin*MIN,stage:(e.s&&e.s.st)||p.stage,p:p.p,name:p.name,gen:p.gen,disc:60});
+      Object.assign(r,{uid:p.uid,ancU:p.ancU,momName:p.momName,dadName:p.dadName,seed:p.seed,shaped:r.stage==='adult'||r.stage==='elder'});addHouse(r);
+      if(e===main)mr=r;try{loveMerge(e.lv,null,'');}catch(err){}}
+    initMain(mr);mr.happy=Math.max(2,(main.s&&main.s.h)||3);mr.hunger=Math.max(2,(main.s&&main.s.hu)||3);mr.aff=Math.max(mr.aff||0,40);
+    log(t,`${mr.name}回来了`);save();window.__noSave=true;setTimeout(()=>location.reload(),300);cap(`${mr.name}回来了！`,4);sndCute();
+  },()=>setScreen(recoverScreen())));
+}
 function importScreen(back){return{name:'paste',hint(){return'长按框框贴上存档码，再按 B 读取\nC 返回';},A(){},
   B(){const ta=ui.querySelector('textarea');const txt=ta?ta.value:'';readSave(txt).then(r=>{if(r.err){cap(r.err,5);sndNo();return;}
     const o=r.s;const mm=o.rabbits.find(x=>x.id===o.mainId);
@@ -2977,7 +3000,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
