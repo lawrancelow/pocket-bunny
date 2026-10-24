@@ -2752,7 +2752,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.24e';
+const GAME_VER='2026.10.24f';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -2796,6 +2796,16 @@ function moveWebScreen(){return{name:'pages',idx:0,hint(){return this.idx===0?'�
   html(){const m=mainR();return`<div class="panel"><div class="ttl">口袋兔子搬家了！</div><div class="body"><p class="sm">以后玩网址版，我更新游戏你不用再下载。${m?`按一下就把<b>${esc(m.name)}</b>和全部进度带过去：`:''}</p><ul><li class="${this.idx===0?'sel':''}" data-i="0">现在搬过去</li><li class="${this.idx===1?'sel':''}" data-i="1">以后再说</li></ul></div></div>`;}};}
 function movedScreen(){return{name:'pages',hint:()=>'按 B 再打开网址版',A(){},tap(){},C(){toMain();},B(){location.href=WEB_URL;},
   html(){return`<div class="panel" data-tap="1"><div class="ttl">已经搬到网址版了</div><div class="body"><p class="sm">你的兔子现在住在网址版里，这个旧文件不会再更新了。</p><p class="sm">请从手机桌面的「口袋兔子」图示打开；还没加到主画面的话，按 B 打开网址版，再按 Chrome 的「⋮ → 加到主画面」。</p></div></div>`;}};}
+// 下载的文件变成「启动器」：打开就自动搬家（有兔子时）并直接进入网址版开始玩
+const IS_LOCAL=/^(file|content):/.test(location.protocol);
+function busyScreen(title,msg){return{name:'pages',hint:()=>msg,A(){},B(){},C(){},tap(){},html(){return`<div class="panel"><div class="ttl">${esc(title)}</div><div class="body"><p class="sm">${esc(msg)}</p></div></div>`;}};}
+function fileLauncher(){
+  if(!IS_LOCAL)return;
+  if(navigator.onLine===false){if(S.movedWeb)setScreen(pages('需要网络',['<p>你的兔子已经搬到网址版了。</p><p class="sm">请连上网络再打开这个文件，或者从手机桌面的「口袋兔子」图示打开（没网络也能玩）。</p>'],()=>toMain()));return;}
+  const has=S.started&&S.rabbits.some(r=>!r.temp);
+  if(has&&!S.movedWeb){const m=mainR();setScreen(busyScreen('口袋兔子搬家中',`${m?m.name+'和':''}全部进度正在搬到新家，马上就好…`));setTimeout(moveToWeb,900);return;}
+  setScreen(busyScreen('口袋兔子','正在打开…'));setTimeout(()=>{try{location.replace(WEB_URL);}catch(e){location.href=WEB_URL;}},500);
+}
 // 网址版收到 #save= 时自动搬进来
 async function webReceive(){
   if(!IS_WEB)return;const h=location.hash||'';if(!h.startsWith('#save='))return;
@@ -2804,6 +2814,7 @@ async function webReceive(){
   const o=r.s,mm=o.rabbits.find(x=>x.id===o.mainId);
   const doIt=()=>{try{localStorage.setItem(KEY,JSON.stringify(o));localStorage.setItem('tuwo_moved','1');}catch(e){cap('存不进去：手机空间不足',5);return;}window.__noSave=true;location.reload();};
   if(!S.started||!mainR()){doIt();return;}
+  {const nm=o.rabbits.find(x=>x.id===o.mainId),cm=mainR();if(nm&&cm&&nm.uid&&nm.uid===cm.uid){doIt();return;}}
   setScreen(confirmScr('搬家',`要把旧版的${mm?`<b>${esc(mm.name)}</b>和`:''}${o.rabbits.length}只兔子搬进来吗？<br><b>这里现在的进度会被取代。</b>`,doIt,()=>toMain()));
 }
 // 安装到桌面
@@ -2848,7 +2859,6 @@ function checkQueue(){
   if(mode!=='main')return;
   if(S.advNew&&!inTut()){const a=S.advNew;S.advNew=null;save();setScreen(postcardScreen(a));sndCute();return;}
   if(!inTut()&&S.net&&S.net.inq&&S.net.inq.length&&netCheckInbox())return;
-  if(!IS_WEB&&S.started&&mainR()&&!inTut()&&location.protocol==='file:'){if(S.movedWeb){if(!window.__movedShown){window.__movedShown=1;setScreen(movedScreen());return;}}else if(!S.moveAsk||Date.now()-S.moveAsk>20*3600000){setScreen(moveWebScreen());return;}}
   const pn=S.nests.find(n=>n.pick);if(pn){setScreen(pickScreen(pn));return;}
   if(S.moonQ.length){setScreen(moonScreen(S.moonQ[0]));return;}
   if(S.started&&!mainR()){setScreen(successorScreen());return;}
@@ -2960,10 +2970,10 @@ function boot(){
   requestAnimationFrame(frame);
 }
 boot();
-try{webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
+try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
