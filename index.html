@@ -252,7 +252,7 @@ const now=()=>Date.now()+DBG;
 function fresh(){return{v:2,t:Math.floor(now()/MIN)*MIN,nextId:1,nextNest:1,rabbits:[],mainId:null,prevMain:null,nests:[],poops:[],dirtySince:0,light:true,calls:{},sitter:null,suitors:null,sound:true,log:[],dex:{},hist:{},seen:{},moonQ:[],tut:0,started:false,best:{},shell:'lavender',nick:'',usedCodes:[],myCodes:[],album:[],treasures:{},sup:{last:{}},decor:{},pendQ:[],gift:null};}
 function migrate(){for(const r of S.rabbits){if(!r.uid)r.uid=rid();}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
 function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(o&&o.v===2){S=Object.assign(fresh(),o);migrate();return;}}}catch(e){}S=fresh();}
-function save(){if(window.__noSave)return;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}try{netMark();}catch(e){}}
+function save(){if(window.__noSave)return;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}try{netBackup();}catch(e){}try{netMark();}catch(e){}}
 const byId=id=>S.rabbits.find(r=>r.id===id);
 const mainR=()=>S.mainId==null?null:byId(S.mainId)||null;
 const isMain=r=>!!r&&r.id===S.mainId;
@@ -2572,7 +2572,8 @@ async function netAuth(){
   if(NET.tok&&Date.now()<NET.exp-120000)return NET.tok;
   let r;
   if(n.rt){r=await fetch(`${c.tok}/v1/token?key=${c.key}`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(n.rt)});
-    if(r.ok){const j=await r.json();NET.tok=j.id_token;NET.exp=Date.now()+(+j.expires_in||3600)*1000;n.rt=j.refresh_token;n.uid=j.user_id;save();return NET.tok;}}
+    if(r.ok){const j=await r.json();NET.tok=j.id_token;NET.exp=Date.now()+(+j.expires_in||3600)*1000;n.rt=j.refresh_token;n.uid=j.user_id;save();return NET.tok;}
+    if(r.status!==400)throw new Error('refresh '+r.status);}
   r=await fetch(`${c.auth}/v1/accounts:signUp?key=${c.key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({returnSecureToken:true})});
   if(!r.ok)throw new Error('auth '+r.status);const j=await r.json();
   NET.tok=j.idToken;NET.exp=Date.now()+(+j.expiresIn||3600)*1000;n.rt=j.refreshToken;n.uid=j.localId;save();return NET.tok;
@@ -2611,17 +2612,18 @@ async function netPublish(force){
   if(!netOn())return;const n=netS();if(!force&&!NET.dirty&&Date.now()-NET.lastPub<180000)return;if(!force&&Date.now()-NET.lastPub<20000)return;
   NET.dirty=false;NET.lastPub=Date.now();
   const rb={};for(const r of household()){if(r.stage==='nest')continue;rb[r.uid]={p:packR(r),s:rabbitStatus(r),lv:loveExport(r.uid)};}
-  try{await api('PUT','players/'+n.uid,{nick:S.nick||'兔主人',code:n.code,pid:pid(),at:Date.now(),rb});}catch(e){NET.dirty=true;}
+  try{await api('PUT','players/'+n.uid,{nick:S.nick||'兔主人',code:n.code,pid:pid(),at:Date.now(),rb,fr:Object.keys(n.friends).slice(0,40)});}catch(e){NET.dirty=true;}
 }
 function netMark(){NET.dirty=true;}
 async function netStart(){
   if(!IS_WEB&&S&&S.movedWeb){NET.status='off';return;}
   if(!netCfg()){NET.status='nocfg';return;}if(NET.status==='connecting')return;
   NET.status='connecting';NET.err='';
-  try{await netAuth();await netEnsureCode();NET.status='online';await netPublish(true);netWatchAll();
-    if(!NET.timer)NET.timer=setInterval(()=>{if(netOn())netPublish(false);else if(NET.status==='offline'&&navigator.onLine!==false)netStart();},15000);
+  try{netRestoreId();}catch(e){}
+  try{await netAuth();await netEnsureCode();NET.status='online';await netPublish(true);netWatchAll();setTimeout(()=>netRelink().catch(()=>{}),6000);
+    if(!NET.timer)NET.timer=setInterval(()=>{if(netOn()){netPublish(false);netRelink().catch(()=>{});}else if(NET.status==='offline'&&navigator.onLine!==false)netStart();},15000);
     renderStrip();}
-  catch(e){NET.status='offline';NET.err=String(e&&e.message||e);if(!NET.timer)NET.timer=setInterval(()=>{if(netOn())netPublish(false);else if(NET.status==='offline')netStart();},30000);}
+  catch(e){NET.status='offline';NET.err=String(e&&e.message||e);if(!NET.timer)NET.timer=setInterval(()=>{if(netOn()){netPublish(false);netRelink().catch(()=>{});}else if(NET.status==='offline')netStart();},30000);}
 }
 function netWatchAll(){
   const n=netS();
@@ -2772,7 +2774,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.25b';
+const GAME_VER='2026.10.25c';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3288,6 +3290,34 @@ function recvEmote(c){const from=String(c.n||'朋友').slice(0,8);const e=EMOTES
   cap(`${from}送了${m?m.name:'你'}一个${e[0]}！`,5);sndCute();save();return true;}
 function notesScreen(){const N=(S.notes||[]).slice().reverse();return pages('好友留言',N.length?N.map(n=>`<p class="sm k">${new Date(n.t).getMonth()+1}月${new Date(n.t).getDate()}日 · ${esc(n.from)}</p><p class="diary">${esc(n.txt)}</p>`):['<p>还没有留言。</p>'],()=>setScreen(bookMenu()));}
 
+
+// —— 联网身份保护：存档被换掉/重新找回兔子时，好友不会丢 ——
+function netBackup(){const n=S&&S.net;if(!n||!n.rt||!n.uid)return;
+  localStorage.setItem('tuwo_id',JSON.stringify({uid:n.uid,rt:n.rt,code:n.code||'',codeOk:n.codeOk||0,friends:n.friends||{},at:Date.now()}));}
+function netRestoreId(){let b=null;try{b=JSON.parse(localStorage.getItem('tuwo_id')||'null');}catch(e){}
+  if(!b||!b.rt||!b.uid)return false;const n=netS();if(n.uid===b.uid)return false;
+  const mine=n.friends||{};n.uid=b.uid;n.rt=b.rt;n.code=b.code;n.codeOk=b.codeOk;
+  n.friends=Object.assign({},b.friends||{},mine);delete n.friends[b.uid];NET.tok=null;NET.exp=0;save();return true;}
+// 好友换了身份（或我自己换了），用兔子的身份证自动接回来
+let RELINK_AT=0;
+async function netRelink(force){
+  if(!netOn()||(!force&&Date.now()-RELINK_AT<20*60000))return 0;RELINK_AT=Date.now();
+  const n=netS();let all;try{all=await api('GET','players');}catch(e){return 0;}if(!all||typeof all!=='object')return 0;
+  const mainOf=p=>{if(!p||!p.rb)return null;for(const[ru,e]of Object.entries(p.rb))if(e&&e.s&&e.s.mn)return ru;return null;};
+  const newest={};for(const[u,p]of Object.entries(all)){const m=mainOf(p);if(!m)continue;if(!newest[m]||(p.at||0)>newest[m].at)newest[m]={u,at:p.at||0};}
+  let changed=0;const myMain=mainR()&&mainR().uid;
+  // ① 我以前的身份：把那时的好友接回来
+  if(myMain)for(const[u,p]of Object.entries(all)){if(u===n.uid||mainOf(p)!==myMain||(p.at||0)>((all[n.uid]||{}).at||Date.now()))continue;
+    for(const fu of(Array.isArray(p.fr)?p.fr:[])){if(fu===n.uid||n.friends[fu]||!all[fu])continue;
+      netAddFriendUid(fu,{nick:all[fu].nick,code:all[fu].code},true);netSend(fu,'',{k:'friend'}).catch(()=>{});changed++;}}
+  // ② 朋友换了新好友码：它的主兔子出现在更新的记录里，就跟过去
+  for(const[fu,f]of Object.entries(Object.assign({},n.friends))){const p=all[fu];const m=mainOf(p)||f.mru;if(!m)continue;if(mainOf(p))f.mru=m;
+    const w=newest[m];if(!w||w.u===fu||w.u===n.uid||w.at<((p&&p.at)||0)+60000)continue;
+    const np=all[w.u];if(!n.friends[w.u])n.friends[w.u]={nick:np.nick||f.nick,code:np.code||'',added:f.added||Date.now(),mru:m};
+    delete n.friends[fu];netClose('f:'+fu);delete NET.live[fu];netSend(w.u,'',{k:'friend'}).catch(()=>{});changed++;
+    log(now(),`${f.nick}换了新的好友码，已经自动接上`);}
+  if(changed){save();netWatchAll();netPublish(true);if(mode==='main')cap('好友已经自动接回来了',4);}
+  return changed;}
 /* ================= main loop ================= */
 function checkQueue(){
   if(mode!=='main')return;
@@ -3407,7 +3437,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
