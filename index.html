@@ -978,7 +978,7 @@ function needMain(){const r=mainR();if(!r){sndNo();return null;}if(homeAway()){c
 function activate(id){
   if(id==='feed'){const r=needMain();if(!r)return;if(isAsleep(r,now())){cap(`嘘，${r.name}在睡觉`);sndNo();selIcon=-1;return;}setScreen(feedMenu(r));}
   else if(id==='light'){S.light=!S.light;sndClick();cap(S.light?'开灯':'关灯');selIcon=-1;save();}
-  else if(id==='play'){const r=needMain();if(!r)return;const why=cantPlay(r);if(why){cap(why);sndNo();selIcon=-1;return;}setScreen(menu('玩耍 · '+r.name,()=>{const L=GAMES.map(x=>({t:x.n,s:x.s+(bestOf(x.id)?` · 最高${bestOf(x.id)}`:''),on:()=>x.f(r)}));if((r.tricks||[]).length)L.unshift({t:'叫它表演',s:`会${r.tricks.length}种把戏`,on:()=>setScreen(trickMenu(r))});L.unshift({t:'剪指甲',s:`指甲 ${Math.round(r.nail||0)}%`,dis:nailBlock(r),on:()=>setScreen(nailScreen(r))});L.unshift({t:'梳毛',s:`毛乱 ${Math.round(r.fur||0)}%`,dis:groomBlock(r),on:()=>setScreen(groomScreen(r))});L.unshift({t:'兔子运动会',s:'5个项目',dis:sportBlock(r),h:'冲刺跑、障碍赛、跳高、跳远、啃胡萝卜；可以自己比，也能约好友同场',on:()=>setScreen(sportMenu(r))});L.unshift({t:'兔子公园',s:'和好友相遇',dis:mpBlock(),h:'进公园就能遇到在线好友的兔子',on:()=>parkScreen()});L.unshift({t:'约好友抢胡萝卜',s:'实时对战',dis:mpBlock()||(Object.keys(netS().friends).some(fu=>isFresh(NET.live[fu]))?null:'现在没有在线的好友'),on:()=>setScreen(menu('约谁玩？',Object.entries(netS().friends).filter(([fu])=>isFresh(NET.live[fu])).map(([fu,f])=>({t:f.nick,s:'在线',on:()=>inviteCarrot(fu)})),null))});L.unshift({t:'带它去散步',s:'出门走走',dis:walkBlock(r),on:()=>setScreen(walkMenu(r))});return L;},null,`${GAMES.length}个游戏`));}
+  else if(id==='play'){const r=needMain();if(!r)return;const why=cantPlay(r);if(why){cap(why);sndNo();selIcon=-1;return;}setScreen(menu('玩耍 · '+r.name,()=>{const L=GAMES.map(x=>({t:x.n,s:x.s+(bestOf(x.id)?` · 最高${bestOf(x.id)}`:''),on:()=>x.f(r)}));if((r.tricks||[]).length)L.unshift({t:'叫它表演',s:`会${r.tricks.length}种把戏`,on:()=>setScreen(trickMenu(r))});L.unshift({t:'剪指甲',s:`指甲 ${Math.round(r.nail||0)}%`,dis:nailBlock(r),on:()=>setScreen(nailScreen(r))});L.unshift({t:'梳毛',s:`毛乱 ${Math.round(r.fur||0)}%`,dis:groomBlock(r),on:()=>setScreen(groomScreen(r))});L.unshift({t:'兔子训练',s:`体力 ${fitDots(r)}`,dis:sportBlock(r),h:'练速度、弹跳、食量，练得越高运动会越容易赢',on:()=>setScreen(trainMenu(r))});L.unshift({t:'兔子运动会',s:'5个项目',dis:sportBlock(r),h:'冲刺跑、障碍赛、跳高、跳远、啃胡萝卜；可以自己比，也能约好友同场',on:()=>setScreen(sportMenu(r))});L.unshift({t:'兔子公园',s:'和好友相遇',dis:mpBlock(),h:'进公园就能遇到在线好友的兔子',on:()=>parkScreen()});L.unshift({t:'约好友抢胡萝卜',s:'实时对战',dis:mpBlock()||(Object.keys(netS().friends).some(fu=>isFresh(NET.live[fu]))?null:'现在没有在线的好友'),on:()=>setScreen(menu('约谁玩？',Object.entries(netS().friends).filter(([fu])=>isFresh(NET.live[fu])).map(([fu,f])=>({t:f.nick,s:'在线',on:()=>inviteCarrot(fu)})),null))});L.unshift({t:'带它去散步',s:'出门走走',dis:walkBlock(r),on:()=>setScreen(walkMenu(r))});return L;},null,`${GAMES.length}个游戏`));}
   else if(id==='med'){const r=needMain();if(!r)return;medicine(r);selIcon=-1;}
   else if(id==='clean'){if(!S.poops.length){cap('兔舍很干净');sndNo();}else{S.poops=[];S.dirtySince=0;dn(mainR(),'clean');addCoins(2,'打扫',1);FX.push({k:'sweep',life:.9});sndOk();cap('打扫干净了！');tutDone(3);}selIcon=-1;save();}
   else if(id==='status'){const r=mainR();if(!r){sndNo();return;}setScreen(profileScreen(r,null,S.tut===4?1:0));tutDone(4);}
@@ -1231,7 +1231,7 @@ function helpScreen(){
     `<p>要出门或睡觉前，可以在「家族」里请邻居照顾，最多10小时。这段时间不会算照顾失误。</p>`,
     `<p>「家族 → 朋友联机」可以和朋友互传兔子码：串门码让你的兔子去朋友家玩3小时、礼物码送礼、宝宝码送养兔子。</p><p>客人兔成年的话可以和你的兔子相亲。母兔那一方会生下宝宝，宝宝带着两家的血统。每个码只能用一次。</p>`,
     `<p>你越用心照顾，兔子跟你越亲密（「状态」里看得到）。越亲密，它越常做出可爱的小举动，还会叼礼物给你。</p><p>特别的时刻会自动拍下来，放进「兔谱 → 回忆册」。</p><p><b>散步</b>：「玩耍 → 带它去散步」。路上遇到东西会停下来，按 B 去看看、A 继续走、C 提早回家。越亲密、去得越多，能去的地方越多。</p><p><b>出门</b>：兔子去朋友家串门、或托给邻居阿姨照顾时，会真的离开家，屏幕上会显示回来的倒数时间。想提早接回来，去「家族」里选「接回来」。</p><p><b>朋友簿</b>：收到过码的朋友都会记在「家族 → 朋友联机 → 朋友簿」。见过的朋友兔子可以直接「向它求亲」，也能约朋友的兔子赛跑，双方都看得到同一场比赛。</p><p><b>胡萝卜币和小店</b>：玩游戏、散步、梳毛剪指甲、每天照顾都会得到胡萝卜币，在「兔谱 → 小店」买零食、家具（兔子会自己去用）和饰品（戴在兔子身上，好友在公园也看得到）。</p><p><b>梳毛・剪指甲</b>：在「玩耍」里。换毛季（3、4、9、10月）毛掉得特别快，用手指在兔子身上来回刷；剪指甲要在剪刀对准白色部分时按 B，别剪到粉红色的血线。</p><p><b>天气</b>：窗外会下雨、打雷、起雾、出彩虹。打雷时胆小的兔子会害怕，要摸摸它；下雨要戴「小雨帽」才能散步。</p><p><b>留言・心意</b>：在「家族 → 好友」点好友，可以写纸条或送摸摸、抱抱。</p><p><b>和好友一起玩</b>：「玩耍」里有「约好友抢胡萝卜」（两人实时比赛）和「兔子公园」（遇到在线好友的兔子，A 丢胡萝卜、B 碰鼻子）。在「家族 → 好友」点好友，可以送今天的礼物，连续送三天会得到友情徽章。兔子去好友家住时，好友可以喂它、摸它，它回家会带回住宿报告。</p><p><b>好友（实时）</b>：在「家族 → 朋友联机 → 好友」拿你的好友码给朋友，对方加了以后，双方的兔子会实时出现在「找对象」里。可以直接约朋友的兔子去花园玩、求亲，对方手机会马上收到，两边一起看约会。要有网络才能用，没网络照样能养兔子。</p><p><b>兔子谈恋爱</b>：别人家的兔子来串门时，两只会自己玩在一起；在「家族」里点客人，选「一起去花园玩」约会。感情分四级：初识 → 玩伴 → 喜欢（会主动依偎）→ 相爱。到「相爱」才会在约会时交配，也才能向朋友的兔子求亲。相爱之后分开了，你的兔子会想念对方，屏幕下方会提醒你。</p><p><b>兔子生气了</b>：被冤枉骂、打针、摸太多次都会让它背对你。喂它最爱的零食马上就好；或者每隔一会儿轻轻摸它一下，摸三次它就会原谅你（一直狂点没用）。不理它的话，几分钟后也会自己消气。</p><p><b>日记</b>：兔子每晚会把这一天写成日记，在「兔谱 → 兔子日记」。</p><p><b>探险</b>：你离开四小时以上，胆大的兔子可能偷偷出门，寄回明信片和宝物。</p>`,
-    `<p>「玩耍」里有7个小游戏：猜方向、跳栏赛、接零食、打地鼠、跟我做、兔子长龙、俄罗斯方块。</p><p>玩得好兔子会更开心，活泼的兔子开心得更多。每个游戏都会记最高纪录。玩到一半想离开，点下面那行提示字就行。</p><p><b>兔子运动会</b>：冲刺跑、障碍赛、跳高、跳远、啃胡萝卜五个项目。可以和电脑兔比，也能约最多4位好友同场（最多5只，空位由电脑兔补上）。越练越强，五项总冠军拿金牌和奖杯。</p>`
+    `<p>「玩耍」里有7个小游戏：猜方向、跳栏赛、接零食、打地鼠、跟我做、兔子长龙、俄罗斯方块。</p><p>玩得好兔子会更开心，活泼的兔子开心得更多。每个游戏都会记最高纪录。玩到一半想离开，点下面那行提示字就行。</p><p><b>兔子运动会</b>：冲刺跑、障碍赛、跳高、跳远、啃胡萝卜五个项目。可以和电脑兔比，也能约最多4位好友同场（最多5只，空位由电脑兔补上）。「兔子训练」可以练速度、弹跳、食量（每次用1点体力，体力每2小时恢复1点），练得越高比赛越容易赢。五项总冠军拿金牌和奖杯。</p>`
   ],()=>setScreen(bookMenu()));
 }
 function logScreen(){const L=S.log.slice().reverse().slice(0,40);return pages('记录',[L.length?L.map(e=>`<p class="lg"><b>${clock(e.t)}</b>${esc(e.msg)}</p>`).join(''):'<p>还没有记录</p>'],()=>setScreen(bookMenu()));}
@@ -2775,7 +2775,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.25d';
+const GAME_VER='2026.10.26a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3332,20 +3332,22 @@ const SPN=Object.fromEntries(SPORTS.map(s=>[s.id,s]));
 const SP_PTS=[10,7,5,3,1];
 const SP_STN={spd:'速度',jmp:'弹跳',eat:'食量'};
 const SPH=1/60;
-const HJ=[40,50,60,70,80,85,90,95,100,105,110,115,120];
+const HJ=[40,50,60,70,80,85,90,95,100,105,110,115,120,125,130];
 const EAT_T=15,EAT_BP=.46,EAT_B0=.8;
 TREASURES.push(['cup','运动会奖杯',3,['zzzzz','zzzzz','.zzz.','..z..','.zzz.']]);BM.tr_cup=TREASURES[TREASURES.length-1][3];TRE.cup=TREASURES[TREASURES.length-1];
 function g01(rnd){let u=0;while(!u)u=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*rnd());}
 function sportOf(r){r.sport=r.sport||{};const s=r.sport;s.spd=s.spd||0;s.jmp=s.jmp||0;s.eat=s.eat||0;s.med=s.med||{g:0,s:0,b:0};s.rec=s.rec||{};s.win=s.win||{};s.n=s.n||0;return s;}
 function sportAb(p){const tr=p.tr||{};const a=k=>(tr[k]==null?50:tr[k])-50;const stM={junior:.95,adult:1,elder:.92}[p.st]||.9;const t=p.sp||{};const fat=p.fat?.96:1;
-  return{spd:(1+a('active')/500+(t.spd||0)*.004)*stM*fat,jmp:(1+a('brave')/600+a('active')/1000+(t.jmp||0)*.004)*stM*fat,eat:1+a('greedy')/350+(t.eat||0)*.004};}
+  return{spd:(1+a('active')/1000+(t.spd||0)*SP_LV)*stM*fat,jmp:(1+a('brave')/1200+a('active')/2000+(t.jmp||0)*SP_LV)*stM*fat,eat:1+a('greedy')/700+(t.eat||0)*SP_LV};}
+const SP_LV=.015,SP_MAX=20;
+function hjTop(ab){let t=0;for(const h of HJ)if(h+3<=104*ab.jmp)t=h;return t;}
 function myAb(m){return sportAb({tr:m.tr,st:m.stage,sp:sportOf(m),fat:m.weight>IDEAL[m.stage]*1.25});}
 function sportBlock(m){if(!m||m.stage==='nest')return'现在没有兔子';if(awayR(m))return`${m.name}不在家`;if(m.stage==='kit')return`${m.name}还太小，长成少年兔再来比`;return cantPlay(m);}
 function sportAIs(seed,n,used){const rnd=mulberry((seed^0x5bd1e995)>>>0);const names=(Array.isArray(NAMES)?NAMES:String(NAMES).split(/\s+/)).filter(Boolean);const L=[];
   for(let i=0;i<n;i++){let nm,k=0;do{nm=names[Math.floor(rnd()*names.length)];k++;}while(used.has(nm)&&k<200);used.add(nm);
     const g={};for(const q in FREQ){const[x,y,p]=FREQ[q];g[q]=[rnd()<p?x:y,rnd()<p?x:y];}
     const tr={};for(const q of TR)tr[q]=Math.floor(8+rnd()*84);
-    const a={u:'ai'+i,nm,g,sd:Math.floor(rnd()*1e9),st:'adult',tr,sk:.35+rnd()*.5,ac:null};a.ab=sportAb(a);L.push(a);}
+    const sp={spd:rnd()*6,jmp:rnd()*6,eat:rnd()*6};const a={u:'ai'+i,nm,g,sd:Math.floor(rnd()*1e9),st:'adult',tr,sp,sk:.35+rnd()*.5,ac:null};a.ab=sportAb(a);L.push(a);}
   return L;}
 function hurdlePos(seed){const rnd=mulberry((seed^0x9e3779b9)>>>0);const L=[];let x=11+rnd()*2;for(let i=0;i<8;i++){L.push(Math.round(x*10)/10);x+=6.4+rnd()*2.6;}return L;}
 // —— 连按（A、C 轮流）——
@@ -3374,8 +3376,8 @@ const SPE={
        this.hi++;}
      if(this.x>=80){this.done=true;const rt=this.t-(this.x-80)/Math.max(this.v,.5);this.sc=Math.round((rt+this.f*2)*100)/100;this.note=this.f?`跑完了，碰倒${this.f}道，${this.sc.toFixed(2)} 秒`:`零失误！${this.sc.toFixed(2)} 秒`;}},
    pose(){if(this.air>0){const p=1-this.air/jd;return['hop',Math.round(Math.sin(p*Math.PI)*7)];}return gait(this);},cur(){return this.x;}};},
- high(ab){const cap=108*ab.jmp;return{t:0,k:0,att:0,best:0,mi:0,ph:'aim',pt:0,pos:0,q:0,jh:0,clr:false,done:false,sc:null,note:'',cap,
-   P(){return 1.25-.035*this.k;},need(){return((HJ[this.k]+3)/cap-.3)/.7;},
+ high(ab,ctx){const cap=104*ab.jmp;return{t:0,k:(ctx&&ctx.k0)||0,att:0,best:0,mi:0,ph:'aim',pt:0,pos:0,q:0,jh:0,clr:false,done:false,sc:null,note:'',cap,
+   P(){return 1.25-.03*this.k;},need(){return((HJ[this.k]+3)/cap-.3)/.7;},
    press(k){if(k!=='B'||this.done||this.ph!=='aim'||this.pt<.35)return;this.jump();},
    jump(){this.q=this.pos;this.jh=cap*(.3+.7*this.q);this.clr=this.jh>=HJ[this.k]+3;this.ph='jump';this.pt=0;},
    step(h){this.t+=h;this.pt+=h;if(this.done)return;
@@ -3383,11 +3385,11 @@ const SPE={
      else if(this.ph==='jump'&&this.pt>=1.3){this.ph='show';this.pt=0;const h0=HJ[this.k];
        if(this.clr){this.best=h0;this.note=`${h0} 厘米，过了！`;}else{this.mi++;this.note=this.att===0?`${h0} 厘米没过，还有一次机会`:`${h0} 厘米两次都没过`;}}
      else if(this.ph==='show'&&this.pt>=1){
-       if(this.clr){this.k++;this.att=0;if(this.k>=HJ.length){this.fin('全部高度都过了！');return;}}
+       if(this.clr){this.k++;this.att=0;if(this.k>=HJ.length){this.fin('全部高度都过了！');return;}if(ctx&&ctx.kn&&this.k>=ctx.k0+ctx.kn){this.fin(`练习完成，最高过了 ${this.best} 厘米`);return;}}
        else{this.att++;if(this.att>=2){this.fin(this.best?`最好成绩 ${this.best} 厘米`:'一个高度都没过');return;}}
        this.ph='aim';this.pt=0;this.pos=0;}},
    fin(t){this.done=true;this.sc=this.best;this.note=t;},cur(){return this.best;}};},
- long(ab){const vm=9*ab.spd,capL=290*ab.jmp;return{t:0,att:0,ph:'ready',pt:0,x:0,v:0,rate:0,last:'',lt:-9,stum:0,ph2:0,res:[],best:0,x0:0,land:0,dist:0,done:false,sc:null,note:'',
+ long(ab){const vm=9*ab.spd,capL=270*ab.jmp;return{t:0,att:0,ph:'ready',pt:0,x:0,v:0,rate:0,last:'',lt:-9,stum:0,ph2:0,res:[],best:0,x0:0,land:0,dist:0,done:false,sc:null,note:'',
    press(k){if(this.done)return;if(this.ph==='ready'&&(k==='A'||k==='C')){this.ph='run';this.pt=0;}
      if(this.ph==='run'){if(k==='B')this.take();else mashPress(this,k);}},
    take(){if(this.x>12){this.foul('踩线犯规！');return;}const d=Math.max(30,Math.round(capL*Math.pow(clamp(this.v/vm,0,1.05),1.3)-(12-this.x)*100));this.ph='air';this.pt=0;this.x0=this.x;this.dist=d;this.land=12+d/100;},
@@ -3454,7 +3456,7 @@ function sportMeet(o){
       // 自己兔子的成绩、训练
       const me=rows.find(r=>r.c.k==='me');const s=sportOf(m);this.gain=[];
       if(me.sc!=null&&(spLow(id)||me.sc>0)&&(s.rec[id]==null||spKey(id,me.sc)<spKey(id,s.rec[id]))){const had=s.rec[id]!=null;s.rec[id]=me.sc;if(had)this.gain.push(`刷新了${m.name}的${this.ev().n}纪录！`);}
-      const st=this.ev().st;const before=Math.floor(s[st]);s[st]=Math.min(15,s[st]+.5);if(Math.floor(s[st])>before)this.gain.push(`${m.name}的${SP_STN[st]}进步了（${Math.floor(s[st])}/15）`);
+      const st=this.ev().st;const before=Math.floor(s[st]);s[st]=Math.min(SP_MAX,s[st]+.3);if(Math.floor(s[st])>before)this.gain.push(`${m.name}的${SP_STN[st]}升到 ${Math.floor(s[st])} 级`);
       if(me.rk===1){s.win[id]=(s.win[id]||0)+1;}
       save();this.ph='res';this.pt=0;me.rk===1?sndOk():sndCute();renderUI();},
     next(){if(this.ph!=='res')return;sndClick();this.ei++;if(this.ei<evs.length){this.ph='card';this.pt=0;renderUI();}else this.podium();},
@@ -3507,7 +3509,7 @@ function sportMeet(o){
       if(this.ph==='wait')return`等其他兔子准备好…\n${ev.n}马上开始`;
       if(this.ph==='count')return`${ev.n} · ${Math.max(1,3-Math.floor(this.pt))}…\n${ev.how}`;
       if(this.ph==='play'){const e=this.E;const rk=this.liveRank();const head=`${ev.n} · 第${rk}名${e.note?' · '+e.note:''}`;
-        const tail=ev.id==='sprint'?'A、C 轮流快按':ev.id==='hurdle'?'栏架前按 B 起跳':ev.id==='high'?(e.ph==='aim'?`${HJ[e.k]} 厘米 · 第${e.att+1}次 · 升到绿色按 B`:'看它跳！'):ev.id==='long'?(e.ph==='ready'?`第${e.att+1}/3跳 · 按 A 开始助跑`:e.ph==='run'?'A、C 快按 · 白板前按 B':'…'):'圆点碰到框框按 B';
+        const tail=ev.id==='sprint'?'A、C 轮流快按':ev.id==='hurdle'?'栏架前按 B 起跳':ev.id==='high'?(e.ph==='aim'?(e.need()>=1?`${HJ[e.k]} 厘米超过弹跳能力了，多训练就跳得过`:`${HJ[e.k]} 厘米 · 第${e.att+1}次 · 升到绿色按 B`):'看它跳！'):ev.id==='long'?(e.ph==='ready'?`第${e.att+1}/3跳 · 按 A 开始助跑`:e.ph==='run'?'A、C 快按 · 白板前按 B':'…'):'圆点碰到框框按 B';
         return head+'\n'+tail;}
       if(this.ph==='post')return`${this.E.note||'完成了'}\n等其他兔子比完…`;
       if(this.ph==='res')return`${this.gain.length?this.gain.join('；'):ev.n+'的成绩出来了'}\n按 B ${this.ei+1<evs.length?'下一项':'看总冠军'}${gid?'（14秒后自动继续）':''} · C 离开`;
@@ -3516,7 +3518,7 @@ function sportMeet(o){
     html(){
       if(this.ask)return`<div class="panel"><div class="ttl">离开运动会？</div><div class="body"><p>${gid?'离开后剩下的项目都算没完成，':''}这次运动会不会有奖牌。</p><ul><li class="${this.qi===0?'sel':''}" data-i="0">离开</li><li class="${this.qi===1?'sel':''}" data-i="1">继续比</li></ul></div></div>`;
       if(this.ph==='card'){const ev=this.ev();const rec=spRec(m,ev.id);
-        return`<div class="panel"><div class="ttl">${ev.n}<span>第${this.ei+1}/${evs.length}项</span></div><div class="body tight"><p>${esc(ev.desc)}</p><p><b>玩法：</b>${esc(ev.how)}</p>${rec?`<p class="sm k">${esc(m.name)}的纪录：${rec}</p>`:''}<p class="sm k">同场：${C.map(c=>esc(c.nm)+(c.k==='me'?'（你）':c.k==='ai'?'':'（'+esc(c.own||'朋友')+'）')).join('、')}</p></div></div>`;}
+        return`<div class="panel"><div class="ttl">${ev.n}<span>第${this.ei+1}/${evs.length}项</span></div><div class="body tight"><p>${esc(ev.desc)}</p><p><b>玩法：</b>${esc(ev.how)}</p><p class="sm k">${esc(m.name)}的${SP_STN[ev.st]}：${Math.floor(sportOf(m)[ev.st])} 级${ev.id==='high'?`，最高大约能过 ${hjTop(ab)} 厘米`:''}${rec?` · 纪录 ${rec}`:''}</p><p class="sm k">同场：${C.map(c=>esc(c.nm)+(c.k==='me'?'（你）':c.k==='ai'?'':'（'+esc(c.own||'朋友')+'）')).join('、')}</p></div></div>`;}
       if(this.ph==='res'){const ev=this.ev();const rows=this.res[this.ei];
         return`<div class="panel"><div class="ttl">${ev.n} 成绩<span>${this.ei+1}/${evs.length}</span></div><div class="body tight">${rows.map(r=>`<p class="row"><span>${r.rk<=3&&r.sc!=null?SP_MEDAL[r.rk-1]:r.rk+'.'} ${r.c.k==='me'?'<b>':''}${esc(r.c.nm)}${r.c.k==='me'?'</b>':''}<small> ${r.c.k==='me'?'你':esc(r.c.own)}</small></span><span>${spFmt(ev.id,r.sc,ev.id==='hurdle'?r.f:0)} <small>+${r.pt}</small></span></p>`).join('')}</div></div>`;}
       if(this.ph==='fin'){const L=this.final;
@@ -3566,7 +3568,7 @@ function spDrawHigh(G,C,MY){const e=G.E;const c=C[MY];spSky(0);spStands(0,9);rec
   else if(e.ph==='show'){x=e.clr?72:62;y=e.clr?46:50;p=e.clr?'sit':'thump';}
   else if(e.done){x=72;y=46;p='sit';}
   const sp=rabbitSprite(c.g,c.sd,p,'open',{s:.75,hb:1.08,ef:.95});drawSprite(sp,Math.round(x),Math.round(y),dir);if(c.ac)drawAcc(c.ac,p,Math.round(x),Math.round(y),dir,{s:.75,hb:1.08,ef:.95});
-  if(e.ph==='aim'&&!e.done){rect(3,12,6,38,INK);rect(4,13,4,36,'#efe6cf');const nd=clamp(e.need(),0,1);if(nd<1){const gy=13+Math.round(36*(1-1));const zy=13+Math.round(36*(1-nd));rect(4,gy,4,zy-gy+1,'#8fd06a');}
+  if(e.ph==='aim'&&!e.done){rect(3,12,6,38,INK);rect(4,13,4,36,'#efe6cf');const nd=clamp(e.need(),0,1);if(nd<1){const zy=13+Math.round(36*(1-nd));rect(4,13,4,Math.max(2,zy-13+1),'#8fd06a');}else{for(let y=13;y<49;y+=2)rect(4,y,4,1,'#e7a2ab');}
     const my=13+Math.round(35*(1-e.pos));rect(2,my,8,1,'#d9485a');rect(10,my-1,1,3,'#d9485a');}
   rect(30,1,36,7,'rgba(246,243,234,.8)');const hs=String(HJ[k]);digits(hs,33,2,INK);for(let i=0;i<2;i++)rect(52+i*4,3,3,3,i<e.att?'#d9485a':i===e.att&&!e.done?INK:'#c9c3cf');
   spBars(G,C,MY);}
@@ -3602,6 +3604,7 @@ function sportMenu(r){const s=sportOf(r);const back=()=>setScreen(sportMenu(r));
     {t:'单人运动会',s:'五项全比',h:`${r.name}和4只电脑兔比完五个项目，总分最高拿金牌`,on:()=>sportSolo(SPORTS.map(x=>x.id))},
     {t:'单项比赛',s:'挑一个项目',h:'和4只电脑兔比一个项目，也能练习',on:()=>setScreen(menu('比哪一项？',SPORTS.map(x=>({t:x.n,s:spRec(r,x.id)?'纪录 '+spRec(r,x.id):'',h:x.desc,on:()=>sportSolo([x.id])})),back))},
     {t:'约好友开运动会',s:'最多5只同场',dis:mpBlock()||(onl.length?null:'现在没有在线的好友'),h:'最多约4位好友；不够5只，空位由电脑兔补上',on:()=>setScreen(sportPick(r,[]))},
+    {t:'兔子训练',s:`体力 ${'●'.repeat(fitOf(r))}${'○'.repeat(FIT_MAX-fitOf(r))}`,h:'练速度、弹跳、食量，练得越高比赛越容易赢',on:()=>setScreen(trainMenu(r,back))},
     {t:'运动成绩',s:`🥇${s.med.g} 🥈${s.med.s} 🥉${s.med.b}`,on:()=>setScreen(sportStats(r,back))},
   ],null,'5个项目');}
 function sportSolo(evs){const m=mainR();const why=sportBlock(m);if(why){cap(why,4);sndNo();return;}
@@ -3613,11 +3616,11 @@ function sportPick(r,sel){const n=netS();
     return items;};
   return menu('约谁来比？',L,()=>setScreen(sportMenu(r)),'最多4位');}
 function sportStats(r,back){const s=sportOf(r);
-  const bar=v=>'■'.repeat(Math.floor(v/3))+'□'.repeat(5-Math.floor(v/3));
+  const bar=v=>'■'.repeat(Math.floor(v/4))+'□'.repeat(5-Math.floor(v/4));
   return pages(`${r.name}的运动成绩`,[
     `<div class="tight"><p class="row"><span>参加运动会</span><b>${s.n}次</b></p><p class="row"><span>金牌</span><b>🥇 ${s.med.g}</b></p><p class="row"><span>银牌</span><b>🥈 ${s.med.s}</b></p><p class="row"><span>铜牌</span><b>🥉 ${s.med.b}</b></p></div>`,
     `<div class="tight">`+SPORTS.map(x=>`<p class="row"><span>${x.n}</span><span>${spRec(r,x.id)||'还没比过'}${s.win[x.id]?` <small>冠军${s.win[x.id]}次</small>`:''}</span></p>`).join('')+`</div>`,
-    `<div class="tight">`+Object.entries(SP_STN).map(([k,v])=>`<p class="row"><span>${v}</span><b>${bar(s[k])} ${Math.floor(s[k])}/15</b></p>`).join('')+`<p class="sm k">每比一项就进步一点。活泼的跑得快，胆大的跳得高，贪吃的吃得多。</p></div>`
+    `<div class="tight">`+Object.entries(SP_STN).map(([k,v])=>`<p class="row"><span>${v}</span><b>${bar(s[k])} ${Math.floor(s[k])}/${SP_MAX}</b></p>`).join('')+`<p class="sm k">去「兔子训练」练习，每升1级成绩就好一截；比赛也会进步一点。</p></div>`
   ],back);}
 
 /* —— 好友联机：邀请 · 大厅 —— */
@@ -3665,6 +3668,50 @@ function sportLobby(gid,host){const n=netS();
   netStream('g:'+gid,'games/'+gid,d=>{if(M&&M.onData)M.onData(d);});
   return L;
 }
+
+/* —— 平时训练：提升速度、弹跳、食量（每升 1 级，相关项目成绩 +1.5%） —— */
+const TRAIN=[
+ {id:'spd',ev:'sprint',n:'速度训练',d:'60 米冲刺练习，跑得越快进步越多',how:'A、C 轮流快按'},
+ {id:'jmp',ev:'high',n:'弹跳训练',d:'从接近极限的高度开始练跳高，跳过越多进步越多',how:'力量条到绿色按 B'},
+ {id:'eat',ev:'eat',n:'食量训练',d:'15 秒跟着节拍啃胡萝卜，吃得越多进步越多',how:'圆点碰到框框按 B'},
+];
+const FIT_MAX=3,FIT_MIN=120;
+function fitOf(r){const s=sportOf(r);const t=now();if(s.fit==null){s.fit=FIT_MAX;s.fitT=t;}
+  if(s.fit<FIT_MAX){const k=Math.floor((t-s.fitT)/(FIT_MIN*MIN));if(k>0){s.fit=Math.min(FIT_MAX,s.fit+k);s.fitT=s.fitT+k*FIT_MIN*MIN;}}return s.fit;}
+function fitNext(r){const s=sportOf(r);fitOf(r);return s.fit>=FIT_MAX?0:Math.max(0,s.fitT+FIT_MIN*MIN-now());}
+const fitDots=r=>'●'.repeat(fitOf(r))+'○'.repeat(FIT_MAX-fitOf(r));
+function trainBlock(r,x){const s=sportOf(r);const w=sportBlock(r);if(w)return w;if(fitOf(r)<1)return`${r.name}累了，${ageText(fitNext(r)/MIN)}后恢复 1 点体力`;if(x&&s[x.id]>=SP_MAX)return`${SP_STN[x.id]}已经练满了`;return null;}
+function trainMenu(r,back){const s=sportOf(r);
+  return menu(`${r.name}的训练`,()=>TRAIN.map(x=>({t:x.n,s:`${SP_STN[x.id]} ${Math.floor(s[x.id])}/${SP_MAX} 级`,dis:trainBlock(r,x),h:x.d,on:()=>setScreen(trainScreen(r,x,back))})),back||null,`体力 ${fitDots(r)}`);}
+function trainScreen(r,x,back){const ab=myAb(r);const s=sportOf(r);const ctx={hs:hurdlePos(ri(1,1e9))};
+  if(x.ev==='high'){const i=HJ.indexOf(hjTop(ab));ctx.k0=Math.max(0,i-3);ctx.kn=5;}
+  const C=[{u:'me',nm:r.name,g:r.g,sd:r.seed,ac:r.acc||null,k:'me'}];const done=()=>{sndClick();setScreen(trainMenu(r,back));};
+  const T={name:'mp',fastBtn:1,ph:'count',pt:0,t:0,et:0,acc:0,E:SPE[x.ev](ab,ctx),ctx,res:null,
+    ev(){return SPN[x.ev];},st(){const[p,y]=this.E.pose();return{x:this.E.x,p,y,fell:{}};},cur(){return this.E.cur();},
+    A(){if(this.ph==='play')this.E.press('A');},
+    B(){if(this.ph==='play')this.E.press('B');else if(this.ph==='res')done();},
+    C(){if(this.ph==='play'){this.E.press('C');return;}if(this.ph==='res')done();},tap(){},
+    upd(dt){dt=Math.min(dt,.1);this.t+=dt;this.pt+=dt;
+      if(this.ph==='count'&&this.pt>=3){this.ph='play';this.pt=0;sndClick();renderStrip();}
+      if(this.ph==='play'){this.acc+=dt;while(this.acc>=SPH){this.acc-=SPH;this.E.step(SPH);this.et+=SPH;}
+        if(this.E.done||this.et>=SPN[x.ev].lim)this.finish();if(Math.floor(this.t*4)!==Math.floor((this.t-dt)*4))renderStrip();}},
+    finish(){const e=this.E;if(!e.done){e.done=true;e.sc=x.ev==='high'?e.best:x.ev==='eat'?Math.round(e.g):null;}
+      let q=0;if(x.ev==='sprint'){const ideal=60/(10*ab.spd)+.6;q=e.sc==null?0:clamp((ideal*1.35-e.sc)/(ideal*.35),0,1);}
+      else if(x.ev==='high')q=clamp((e.k-ctx.k0)/4,0,1);else q=clamp((e.g-60*ab.eat)/(140*ab.eat),0,1);
+      const L=s[x.id];const g=Math.round((.5+q)*Math.max(.35,1-L/(SP_MAX*1.5))*10)/10;const before=Math.floor(L);s[x.id]=Math.min(SP_MAX,L+g);
+      fitOf(r);if(s.fit>=FIT_MAX)s.fitT=now();s.fit=Math.max(0,s.fit-1);
+      r.happy=Math.min(4,r.happy+1);affAdd(r,1);r.weight=Math.max(Math.round(IDEAL[r.stage]*.7),r.weight-25);if(r.hunger>1)r.hunger--;dn(r,'games','训练');
+      const up=Math.floor(s[x.id])>before;if(up)log(now(),`${r.name}的${SP_STN[x.id]}练到 ${Math.floor(s[x.id])} 级了`);
+      this.res={q,g,up,sc:e.sc};this.ph='res';save();up?sndCute():sndOk();renderUI();},
+    hint(){const e=this.E;if(this.ph==='count')return`${x.n} · ${Math.max(1,3-Math.floor(this.pt))}…\n${x.how}`;
+      if(this.ph==='play'){if(x.ev==='high'&&e.ph==='aim')return`${x.n} · ${HJ[e.k]} 厘米 · 第${e.att+1}次${e.note?' · '+e.note:''}\n${e.need()>=1?'这个高度超过弹跳能力了':x.how}`;return`${x.n}${e.note?' · '+e.note:''}\n${x.how}`;}
+      return`${this.res.up?`${r.name}的${SP_STN[x.id]}升级了！`:'练完了'}\n按 B 回训练菜单`;},
+    html(){if(this.ph!=='res')return'';const R=this.res;const lv=s[x.id];const stars=R.q>=.8?'★★★':R.q>=.45?'★★☆':R.q>=.15?'★☆☆':'☆☆☆';
+      return`<div class="panel"><div class="ttl">${x.n} 完成<span>${stars}</span></div><div class="body tight"><p class="row"><span>这次成绩</span><b>${spFmt(x.ev,R.sc)}</b></p><p class="row"><span>${SP_STN[x.id]}</span><b>+${R.g.toFixed(1)}　${Math.floor(lv)}/${SP_MAX} 级</b></p><p class="row"><span>升级进度</span><span>${'■'.repeat(Math.floor((lv%1)*10))}${'□'.repeat(10-Math.floor((lv%1)*10))}</span></p><p class="row"><span>剩下体力</span><span>${fitDots(r)}</span></p>${R.up?`<p class="sm"><b>升级了！</b>比赛时${SN(x.id)}会更好。</p>`:`<p class="sm k">表现越好，进步越多。</p>`}</div></div>`;},
+    draw(){if(x.ev==='sprint')spDrawLanes(this,C,0,'sprint');else if(x.ev==='high')spDrawHigh(this,C,0);else spDrawEat(this,C,0);
+      if(this.ph==='count'){const c=String(Math.max(1,3-Math.floor(this.pt)));rect(38,22,20,16,'rgba(246,243,234,.75)');digits2(c,48-Math.floor(strW(c)),25,INK);}}};
+  sndCute();return T;}
+const SN=id=>({spd:'冲刺跑、障碍赛、跳远的速度',jmp:'跳高、跳远、障碍赛的弹跳',eat:'啃胡萝卜'})[id];
 
 /* ================= main loop ================= */
 function checkQueue(){
@@ -3785,7 +3832,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
