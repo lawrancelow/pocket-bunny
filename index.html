@@ -304,7 +304,7 @@ const grudge=r=>(4+r.tr.temper/10)*MIN;
 function angerLeft(r){return Math.max(0,(r.cold||0)-now());}
 function forgive(r,msg){r.cold=0;r.soothe=0;const v=vis(r);FX.push({k:'heart',x:v.x,y:v.y-20,life:1.4});start(r,v,'binky');v.next={a:'purr'};cap(msg,4);sndCute();save();}
 function soothe(r,amt,msg){const left=angerLeft(r);if(left<=0)return false;const k=r.tr.temper>=68?.7:r.tr.temper<=32?1.4:1;const cut=left*Math.min(1,amt*k);r.cold-=cut;if(angerLeft(r)<40000){forgive(r,`${r.name}转过身来，原谅你了！`);return true;}cap(msg+`（气消了一点，还要${Math.max(1,Math.ceil(angerLeft(r)/MIN))}分钟左右）`,4);sndClick();save();return true;}
-function stageOpts(r){const st=r.stage;return{s:st==='kit'?.58:st==='junior'?.78:1,hb:st==='kit'?1.25:st==='junior'?1.1:1,ef:st==='kit'?.8:st==='junior'?.9:1,elder:st==='elder',preg:!!(r.preg&&(now()-r.preg.at)/MIN>PREG_LEN*.5)};}
+function stageOpts(r){const st=r.stage;return{out:r.out||null,s:st==='kit'?.58:st==='junior'?.78:1,hb:st==='kit'?1.25:st==='junior'?1.1:1,ef:st==='kit'?.8:st==='junior'?.9:1,elder:st==='elder',preg:!!(r.preg&&(now()-r.preg.at)/MIN>PREG_LEN*.5)};}
 
 /* ================= simulation ================= */
 let LIVE=false,liveEvents=[];
@@ -569,7 +569,7 @@ function toSprite(g,Wd,Ht,col,ax,ay){
   return{r:c,l:m,ax,ay,axl:Wd-1-ax,top,w:Wd,h:Ht};
 }
 function rabbitSprite(g,seed,pose,eye,o){
-  const p=phen(g);const key=[pose,eye,o.s,o.hb,o.ef,p.key,p.broken?seed:0,o.elder?1:0,o.preg?1:0].join('|');
+  const p=phen(g);const key=[pose,eye,o.s,o.hb,o.ef,p.key,p.broken?seed:0,o.elder?1:0,o.preg?1:0,o.out||''].join('|');
   let sp=SP.get(key);if(sp)return sp;
   const Wd=26,Ht=25,AX=11,AY=23,s=o.s;
   const spec=poseSpec(pose,o.preg);const[hx,hy,hrx,hry]=spec.H;
@@ -584,6 +584,7 @@ function rabbitSprite(g,seed,pose,eye,o){
   const map=(px,py)=>[(px-AX)/s+9,(py-AY)/s+16.4];
   const gr=rast(parts,Wd,Ht,map);
   const toPx=(X,Y)=>[Math.floor(AX+(X-9)*s),Math.floor(AY+(Y-16.4)*s)];
+  const OUTM=(o.out&&typeof OUTFIT!=='undefined'&&OUTFIT[o.out])?(()=>{const gb=rast(spec.body,Wd,Ht,map);const gh=rast(spec.back?[head,...ears.near]:[head,cheek,...ears.far,...ears.near].filter(Boolean),Wd,Ht,map);const M=new Uint8Array(Wd*Ht);for(let i=0;i<M.length;i++)M[i]=(gb[i]===1||gb[i]===2)&&!(gh[i]&&gh[i]!==9)?1:0;return M;})():null;
   const coat=COATS[p.ck];let main=coat.main,light=coat.light,tick=coat.tick;
   if(o.elder){main=mix(main,'#c8c3bb',.25);light=mix(light,'#d8d3cb',.25);if(tick)tick=mix(tick,'#c8c3bb',.25);}
   const WHITE='#f4f2eb';
@@ -603,6 +604,7 @@ function rabbitSprite(g,seed,pose,eye,o){
       if(ey==='half'&&x===eyeP[0]&&y===eyeP[1]-1)return INK;
       if(noseP&&x===noseP[0]&&y===noseP[1])return'#d46a78';
     }
+    if(OUTM&&(v===1||v===2)&&OUTM[y*Wd+x])return OUTFIT[o.out].col(x,y,v===2,main,light);
     if(v===5)return'#e7a2ab';
     if(p.broken&&(v===1||v===2||v===6||v===7)){
       if(v===1&&(near(x,y,noseP,1)||near(x,y,eyeP,1)))return main;
@@ -717,6 +719,7 @@ const ACT={
  bow:{s(r,v){v.dur=1.8;},u(r,v){const k=Math.floor(v.t/.3)%2;v.pose=k?'wash':'stand';v.eye=k?'closed':'open';}},
  highjump:{s(r,v){v.dur=1.2;v.flip=0;},u(r,v){const p=v.t/v.dur;v.lift=Math.sin(Math.PI*p)*16;v.pose=p<.9?'hop':'sit';if(p>.5&&!v.flip){v.flip=1;v.dir*=-1;}},e(r,v){v.lift=0;}},
  dance:{s(r,v){v.dur=2;},u(r,v){const k=Math.floor(v.t/.25);v.dir=k%2?1:-1;v.pose=k%2?'hop':'sit';v.lift=k%2?2:0;},e(r,v){v.lift=0;}},
+ dig:{s(r,v){v.dur=2.2;v.dir=1;},u(r,v){const k=Math.floor(v.t/.11)%2;v.pose=k?'eat':'loaf';if(Math.random()<.18)FX.push({k:'dust',x:v.x+v.dir*8*stageOpts(r).s,y:v.y-1,vx:-v.dir*rand(4,10),vy:-rand(6,12),life:.45});}},
  melt:{s(r,v){v.dur=3.4;v.pose='flop';v.eye='closed';v.ht=0;},u(r,v,dt){v.pose='flop';v.eye='closed';v.ht+=dt;if(v.ht>.55){v.ht=0;FX.push({k:'heart',x:v.x+ri(-6,6),y:v.y-8,life:1.1});}}},
  giftdrop:{s(r,v,o){v.dur=1.2;v.pose='eat';v.item=null;placeGift(r,v,o.id);}},
  stare:{s(r,v){goTo(r,v,48+ri(-3,3),'staredo');}},
@@ -772,7 +775,7 @@ function chooseAct(r,v){
     if(r.sick)return start(r,v,Math.random()<.85?'sickloaf':'sit');
     if(r.mis&&r.mis.type==='wire')return start(r,v,'chew');
   }
-  if((S.furn||[]).length&&Math.random()<.14){const sc=furnScript(r);if(sc){v.script=sc.slice();const st=v.script.shift();return goTo(r,v,clampX(r,st.go),st.a,st.o,st.item);}}
+  if((S.furn||[]).length&&Math.random()<((S.furn||[]).some(f=>f.id===favToy(r))?.22:.14)){const sc=furnScript(r);if(sc){v.script=sc.slice();const st=v.script.shift();return goTo(r,v,clampX(r,st.go),st.a,st.o,st.item);}}
   const[a,o]=pickAct(r);start(r,v,a,o);
 }
 function updatePen(dt){
@@ -1864,7 +1867,7 @@ let SPEC=null,DREAM=null,FOLLOW=null;
 function drawPeek(){
   const r=mainR();if(!r)return;const t=SPEC.t;
   bx.fillStyle='rgba(207,215,184,.94)';bx.fillRect(0,0,W,H);
-  const blink=(t%2.4)>2.22,sp=rabbitSprite(r.g,r.seed,'sit',blink?'closed':'open',{s:1,hb:1.25,ef:1,elder:r.stage==='elder'});
+  const blink=(t%2.4)>2.22,sp=rabbitSprite(r.g,r.seed,'sit',blink?'closed':'open',{s:1,hb:1.25,ef:1,elder:r.stage==='elder',out:r.out||null});
   const k=2.2,w=26*k,h=25*k,rise=Math.max(0,1-t*1.8)*28,sink=Math.max(0,t-(SPEC.dur-.6))*50;
   const x=Math.round(46-w/2+Math.sin(t*1.1)*1.5),y=Math.round(H-h+6+rise+sink);
   bx.imageSmoothingEnabled=false;bx.drawImage(sp.r,0,0,26,25,x,y,w,h);
@@ -2775,7 +2778,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.27a';
+const GAME_VER='2026.10.27b';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -2905,7 +2908,7 @@ function webInit(){
 }
 
 /* ================= 实时联机玩法：抢胡萝卜 · 兔子公园 · 住宿报告 · 每日礼物 ================= */
-const miniP=r=>({u:r.uid,nm:r.name,g:gStr(r.g),sd:r.seed,sx:r.sex,st:r.stage,ac:r.acc||null,my:r.myopia?1:0});
+const miniP=r=>({u:r.uid,nm:r.name,g:gStr(r.g),sd:r.seed,sx:r.sex,st:r.stage,ac:r.acc||null,my:r.myopia?1:0,out:r.out||null});
 const fakeMini=p=>({uid:p.u,name:p.nm,g:strG(p.g),seed:p.sd,sex:p.sx,stage:p.st,tr:{brave:50,active:50,cuddly:50,greedy:50,naughty:50,temper:50}});
 function friendNick(fu){return(netS().friends[fu]||{}).nick||'朋友';}
 function mpBlock(){const m=mainR(),t=now();if(!m||m.stage==='nest')return'现在没有兔子';if(!netOn())return'没有连上服务器';if(awayR(m))return`${m.name}不在家`;if(isAsleep(m,t))return`${m.name}在睡觉`;if(m.sick)return`${m.name}生病了`;return null;}
@@ -2969,7 +2972,7 @@ function carrotGame(gid,seed,fu,oppP){
         if(it.type==='rock')bm('rock',it.x-3,y-4);else if(it.type==='gold'){bm('carrot',it.x-3,y-2,'#e3b341');if(Math.floor(this.t*6)%2)rect(it.x+3,y-4,1,1,'#fff7b0');}else bm('carrot',it.x-3,y-2);}
       const pose=(mv,st)=>st>0?'thump':mv?((this.t*3)%1<.6?'hop':'sit'):'sit';
       const so=rabbitSprite(opp.g,opp.seed,pose(Math.abs(this.otx-this.ox)>1,0),'open',{s:.7,hb:1.1,ef:.9});drawSprite(so,Math.round(this.ox),61,this.otx<this.ox?-1:1,.75);
-      const sm=rabbitSprite(m.g,m.seed,pose(Math.abs(this.tx-this.x)>1,this.stun),'open',{s:.7,hb:1.1,ef:.9});drawSprite(sm,Math.round(this.x),61,this.tx<this.x?-1:1);
+      const sm=rabbitSprite(m.g,m.seed,pose(Math.abs(this.tx-this.x)>1,this.stun),'open',{s:.7,hb:1.1,ef:.9,out:m.out||null});drawSprite(sm,Math.round(this.x),61,this.tx<this.x?-1:1);
       bm('arrow',Math.round(this.x)-2,30);
       const[a,b]=this.sc();digits(String(a),2,1,INK);const sb=String(b);digits(sb,W-2-strW(sb),1,'#7d6a8a');const tl=String(Math.max(0,Math.ceil(CARROT_T-this.t)));digits(tl,48-Math.floor(strW(tl)/2),1,INK);
       if(this.t<0){const c=String(Math.ceil(-this.t));digits2(c,48-strW(c),24,INK);}
@@ -3011,7 +3014,7 @@ function parkScreen(){
     draw(){const h=hourOf(now());SCENES.park.draw(0,this.t,h);W_LIGHTS=[];const night=isNightH(h);
       const hop=(k,mv)=>mv?((this.t*2.6+k)%1<.65?'hop':'sit'):'sit';
       for(const[fu,o]of this.live()){const r=fakeMini(o.r);const mv=Math.abs(o.x-o.dx)>1||o.act==='walk';const bk=o.act==='binky';
-        const sp=rabbitSprite(r.g,r.seed,bk?'hop':hop(.3,mv),'open',stageOpts({stage:r.stage}));const yy=61-(bk?Math.round(Math.sin((this.t*3)%1*Math.PI)*6):0),dd=o.x<o.dx?-1:1;drawSprite(sp,Math.round(o.dx),yy,dd);drawWear(o.r.ac,o.r.my,bk?'hop':hop(.3,mv),Math.round(o.dx),yy,dd,stageOpts({stage:r.stage}));}
+        const sp=rabbitSprite(r.g,r.seed,bk?'hop':hop(.3,mv),'open',stageOpts({stage:r.stage,out:o.r.out}));const yy=61-(bk?Math.round(Math.sin((this.t*3)%1*Math.PI)*6):0),dd=o.x<o.dx?-1:1;drawSprite(sp,Math.round(o.dx),yy,dd);drawWear(o.r.ac,o.r.my,bk?'hop':hop(.3,mv),Math.round(o.dx),yy,dd,stageOpts({stage:r.stage}));}
       const mv=this.act==='walk',bk=this.at2!=null;const sp=rabbitSprite(m.g,m.seed,bk?'hop':hop(0,mv),'open',stageOpts(m));{const yy=61-(bk?Math.round(Math.sin(Math.min(1,this.at2/.9)*Math.PI)*8):0),dd=this.tx<this.x?-1:1;drawSprite(sp,Math.round(this.x),yy,dd);drawWear(m.acc,m.myopia,bk?'hop':hop(0,mv),Math.round(this.x),yy,dd,stageOpts(m));}
       bm('arrow',Math.round(this.x)-2,26);
       for(const f of fx){if(f.k==='hearts'){for(let i=0;i<3;i++)bm('heart',Math.round(f.x-6+i*5),Math.round(40-f.t*10-i*2),'#d9485a');}
@@ -3123,7 +3126,34 @@ const SHOP=[
  {id:'headband',n:'运动头带',k:'acc',p:30,d:'比赛专用，帅气'},
  {id:'flowerpin',n:'小花夹',k:'acc',p:25,d:'别在耳朵旁边'},
  {id:'sunglasses',n:'墨镜',k:'acc',p:45,d:'酷酷的'},
- {id:'tie',n:'小领结',k:'acc',p:30,d:'像要去参加派对'}];
+ {id:'tie',n:'小领结',k:'acc',p:30,d:'像要去参加派对'},
+ {id:'o_sweater',n:'红毛衣',k:'outfit',p:45,d:'织纹软软的，冬天穿刚好'},
+ {id:'o_stripe',n:'海军条纹衫',k:'outfit',p:45,d:'蓝白条纹，像小水手'},
+ {id:'o_overall',n:'牛仔背带裤',k:'outfit',p:55,d:'有黄色小纽扣'},
+ {id:'o_dots',n:'粉红波点裙',k:'outfit',p:55,d:'白色小圆点，很可爱'},
+ {id:'o_dino',n:'小恐龙装',k:'outfit',p:70,d:'绿色鳞片，肚子是浅色的'},
+ {id:'o_tux',n:'小西装',k:'outfit',p:80,d:'黑西装配白衬衫，正式场合穿'},
+ {id:'o_pumpkin',n:'南瓜装',k:'outfit',p:60,d:'橘色南瓜条纹，万圣节必备'},
+ {id:'o_xmas',n:'圣诞装',k:'outfit',p:60,d:'红衣白边，圣诞节穿'},
+ {id:'o_sport',n:'运动服',k:'outfit',p:50,d:'蓝绿色配白条，运动会穿最帅'},
+ {id:'o_rain',n:'黄色雨衣',k:'outfit',p:50,d:'亮黄色，下雨天穿'},
+ {id:'castle',n:'纸箱城堡',k:'furn',p:45,d:'兔子最爱纸箱，会躲进去当国王'},
+ {id:'digbox',n:'挖挖乐盒',k:'furn',p:40,d:'装满碎纸和干草，让它尽情挖'},
+ {id:'hayball',n:'草编球',k:'furn',p:20,d:'会用鼻子顶着滚、叼起来甩'},
+ {id:'plush',n:'胡萝卜抱枕',k:'furn',p:35,d:'软绵绵，它会靠着睡'},
+ {id:'ring',n:'柳枝咬咬圈',k:'furn',p:25,d:'挂着的磨牙玩具，站起来咬'}];
+// 装扮花纹：x,y 是兔子图像里的像素位置，belly 是肚子
+const OUTFIT={
+ o_sweater:{col:(x,y,b)=>b?'#e8707e':(y%2?'#d9485a':'#c23c4d')},
+ o_stripe:{col:(x,y,b)=>y%3===0?'#f6f3ea':(b?'#4f6fa8':'#2f4f7f')},
+ o_overall:{col:(x,y,b)=>(x===10||x===15)&&y%5===0?'#e3b341':(b?'#6b8fbf':'#4f6fa8')},
+ o_dots:{col:(x,y,b)=>(x*3+y*5)%7===0?'#f6f3ea':(b?'#f2b6c0':'#e7909e')},
+ o_dino:{col:(x,y,b)=>b?'#bfe08a':((x+y)%4===0?'#4a8a3a':'#5f9e45')},
+ o_tux:{col:(x,y,b)=>b?((x+y)%6===0?'#d9485a':'#f6f3ea'):'#2d2a30'},
+ o_pumpkin:{col:(x,y,b)=>x%4===0?'#c96a2a':(b?'#f2a25e':'#e8833a')},
+ o_xmas:{col:(x,y,b)=>b?'#f6f3ea':'#c8323f'},
+ o_sport:{col:(x,y,b)=>y%6===2?'#f6f3ea':(b?'#5fb3a3':'#2f8a7a')},
+ o_rain:{col:(x,y,b)=>b?'#f5e27a':((x*2+y)%9===0?'#e3c43a':'#f2d24a')}};
 const SHOPI=Object.fromEntries(SHOP.map(x=>[x.id,x]));
 Object.assign(BM,{
   sh_berry:['.g.','rrr','rrr','.r.'],sh_cookie:['.yyy.','yfyfy','yyyyy','.yyy.'],
@@ -3137,18 +3167,20 @@ function shopMenu(){
   const back=()=>setScreen(bookMenu());
   return menu('小店',[
     {t:'零食',s:'吃了就没有',on:()=>setScreen(shopList('snack'))},
-    {t:'家具',s:'摆在兔舍里',on:()=>setScreen(shopList('furn'))},
-    {t:'饰品',s:'戴在兔子身上',on:()=>setScreen(shopList('acc'))},
+    {t:'家具・玩具',s:'兔子喜欢的东西',on:()=>setScreen(shopList('furn'))},
+    {t:'装扮',s:'衣服，穿上马上看得到',on:()=>setScreen(shopList('outfit'))},
+    {t:'饰品',s:'戴在兔子头上',on:()=>setScreen(shopList('acc'))},
     {t:'运动用品',s:'训练帮手',on:()=>setScreen(shopList('sport'))},
-    {t:'我的东西',s:'穿戴・摆放',on:()=>setScreen(myStuffMenu())},
+    {t:'衣柜',s:'换装扮・饰品',on:()=>setScreen(wardrobeMenu(()=>setScreen(shopMenu())))},
+    {t:'我的东西',s:'家具・用品',on:()=>setScreen(myStuffMenu())},
     {t:'怎么赚胡萝卜币',on:()=>setScreen(pages('胡萝卜币',['<p class="sm">玩小游戏、散步、抢胡萝卜、梳毛剪指甲都会得到胡萝卜币。</p><p class="sm">喂食、打扫、看病每天也能赚一点（每天最多14个）。</p><p class="sm">每天第一次打开游戏还有5个见面礼。</p>'],()=>setScreen(shopMenu())))}
   ],back,`🥕${S.coins||0}`);
 }
 const owned=id=>{S.inv=S.inv||{};return S.inv[id]||0;};
 function shopList(k){
   const back=()=>setScreen(shopMenu());
-  return menu({snack:'零食',furn:'家具',acc:'饰品',sport:'运动用品'}[k],()=>SHOP.filter(x=>x.k===k).map(x=>{const have=owned(x.id);const done=(k==='furn'||k==='acc')&&have>0;
-    return{t:x.n,s:done?'已经有了':`🥕${x.p}${have&&!done?` · 有${have}个`:''}`,h:x.d,dis:done?'已经买过了，去「我的东西」里使用':(S.coins||0)<x.p?`胡萝卜币不够（还差${x.p-(S.coins||0)}）`:null,
+  return menu({snack:'零食',furn:'家具・玩具',acc:'饰品',sport:'运动用品',outfit:'装扮'}[k],()=>SHOP.filter(x=>x.k===k).map(x=>{const have=owned(x.id);const done=(k==='furn'||k==='acc'||k==='outfit')&&have>0;
+    return{t:x.n+(k==='furn'&&mainR()&&favToy(mainR())===x.id?' ♥':''),s:done?'已经有了':`🥕${x.p}${have&&!done?` · 有${have}个`:''}`,h:(k==='furn'&&mainR()&&favToy(mainR())===x.id?`${mainR().name}最喜欢这个！ `:'')+x.d,dis:done?(k==='furn'?'已经买过了，去「我的东西」里摆放':'已经买过了，去「衣柜」里换'):(S.coins||0)<x.p?`胡萝卜币不够（还差${x.p-(S.coins||0)}）`:null,
       on:()=>setScreen(confirmScr('买东西',`用 🥕${x.p} 买「${x.n}」？`,()=>buy(x),()=>setScreen(shopList(k))))};}),back,`🥕${S.coins||0}`);
 }
 function buy(x){
@@ -3156,16 +3188,25 @@ function buy(x){
   S.coins-=x.p;S.inv=S.inv||{};S.inv[x.id]=(S.inv[x.id]||0)+1;sndOk();
   if(x.k==='furn'){S.furn=S.furn||[];if(S.furn.length<FURN_X.length){placeFurn(x.id);save();toMain();cap(`买了「${x.n}」，已经摆进兔舍了！`,4);return;}save();setScreen(myStuffMenu());cap(`买了「${x.n}」！兔舍只放得下${FURN_X.length}件，去「我的东西」换一下`,5);return;}
   if(x.k==='sport'){save();setScreen(shopList('sport'));cap(`买了「${x.n}」，在「我的东西」或训练菜单里使用`,4);return;}
+  if(x.k==='outfit'){const m=mainR();if(m)m.out=x.id;save();toMain();cap(`买了「${x.n}」，${m?m.name+'已经穿上了':''}！到「小店 → 衣柜」可以换或脱下`,5);sndCute();if(m)firstTime(m,'outfit',`${m.name}穿上了${x.n}`,1);return;}
   if(x.k==='acc'){const m=mainR();if(m){m.acc=x.id;}save();toMain();cap(`买了「${x.n}」，${m?m.name+'已经戴上了':''}！`,4);sndCute();return;}
   save();setScreen(shopList(x.k));cap(`买了「${x.n}」，喂食的时候可以用`,4);
 }
 const FURN_X=[32,56,80];
 function furnFix(){for(const f of S.furn||[]){if(f.x===38)f.x=32;else if(f.x===68)f.x=56;}}
 function placeFurn(id){S.furn=S.furn||[];furnFix();const used=S.furn.map(f=>f.x);const x=FURN_X.find(v=>!used.includes(v));if(x==null)return false;S.furn.push({id,x});return true;}
+function wardrobeMenu(back){const m=mainR();
+  return menu(m?`${m.name}的衣柜`:'衣柜',()=>{if(!m)return[{t:'现在没有兔子',dis:'没有兔子',on:()=>{}}];const L=[];
+    const outs=SHOP.filter(x=>x.k==='outfit'&&owned(x.id)),accs=SHOP.filter(x=>x.k==='acc'&&owned(x.id));
+    L.push({t:'不穿衣服',s:m.out?'':'现在',h:'把衣服脱下来',on:()=>{if(!m.out)return;const was=SHOPI[m.out];m.out=null;save();sndClick();cap(`${m.name}把${was.n}脱下来了`,3);renderUI();}});
+    for(const x of outs)L.push({t:x.n,s:m.out===x.id?'穿着':'装扮',h:m.out===x.id?'按 B 脱下':'按 B 换上',on:()=>{m.out=m.out===x.id?null:x.id;save();sndClick();cap(m.out?`${m.name}换上了${x.n}`:`${m.name}把${x.n}脱下来了`,3);renderUI();}});
+    L.push({t:'不戴饰品',s:m.acc?'':'现在',h:'把头上的饰品拿下来',on:()=>{if(!m.acc)return;const was=SHOPI[m.acc];m.acc=null;save();sndClick();cap(`${m.name}把${was?was.n:'饰品'}拿下来了`,3);renderUI();}});
+    for(const x of accs)L.push({t:x.n,s:m.acc===x.id?'戴着':'饰品',h:m.acc===x.id?'按 B 拿下来':'按 B 戴上',on:()=>{m.acc=m.acc===x.id?null:x.id;save();sndClick();cap(m.acc?`${m.name}戴上了${x.n}`:`${m.name}把${x.n}拿下来了`,3);renderUI();}});
+    if(!outs.length&&!accs.length)L.push({t:'衣柜还是空的',dis:'去小店买装扮或饰品吧',on:()=>{}});
+    return L;},back||null,'按 B 换上／脱下');}
 function myStuffMenu(){
   const back=()=>setScreen(shopMenu());const m=mainR();
   return menu('我的东西',()=>{const L=[];S.inv=S.inv||{};S.furn=S.furn||[];
-    for(const x of SHOP.filter(x=>x.k==='acc'&&owned(x.id)))L.push({t:x.n,s:m&&m.acc===x.id?'戴着':'饰品',on:()=>{if(!m)return;m.acc=m.acc===x.id?null:x.id;save();sndClick();cap(m.acc?`${m.name}戴上了${x.n}`:`${m.name}把${x.n}拿下来了`,3);renderUI();}});
     for(const x of SHOP.filter(x=>x.k==='furn'&&owned(x.id))){const placed=S.furn.some(f=>f.id===x.id);
       L.push({t:x.n,s:placed?'摆着':'收起来了',on:()=>{if(placed){S.furn=S.furn.filter(f=>f.id!==x.id);}else if(!placeFurn(x.id)){cap(`兔舍只放得下${FURN_X.length}件，先收起一件`,4);sndNo();return;}save();sndClick();renderUI();}});}
     for(const x of SHOP.filter(x=>x.k==='sport'&&owned(x.id)))L.push({t:x.n,s:`${owned(x.id)}个`,h:x.d+'，按 B 使用',on:()=>{if(m)useSport(m,x.id);}});
@@ -3196,19 +3237,32 @@ function drawFurn(layer){furnFix();
     else if(f.id==='platform'&&layer==='back'){rect(x-7,56,15,6,'#b8875a');rect(x-7,56,15,1,'#d9a978');rect(x-7,61,15,1,'#8c6440');rect(x-5,58,11,1,'#a07450');}
     else if(f.id==='hurdle'&&layer==='back'){rect(x-5,53,1,9,'#f6f3ea');rect(x+5,53,1,9,'#f6f3ea');rect(x-5,53,11,2,'#d9485a');rect(x-3,53,2,2,'#f6f3ea');rect(x+1,53,2,2,'#f6f3ea');rect(x-6,61,3,1,'#8d8a80');rect(x+4,61,3,1,'#8d8a80');}
     else if(f.id==='flower'&&layer==='back'){rect(x-3,57,7,5,'#c96a4f');rect(x-4,57,9,1,'#d68266');rect(x,52,1,5,'#5f9e45');rect(x-2,54,2,1,'#5f9e45');rect(x-1,50,3,3,'#e7a2ab');rect(x,51,1,1,'#e3b341');rect(x+2,53,2,2,'#f2c0c8');}
+    else if(f.id==='castle'&&layer==='back'){rect(x-8,48,17,14,'#d2a46a');rect(x-8,48,17,1,'#e6c08a');for(let i=0;i<4;i++)rect(x-8+i*5,45,3,3,'#d2a46a');rect(x-3,54,7,8,'#3b3028');rect(x-2,53,5,1,'#3b3028');rect(x-6,50,2,2,'#3b3028');rect(x+5,50,2,2,'#3b3028');rect(x,41,1,4,INK);rect(x+1,41,3,2,'#d9485a');rect(x-8,61,17,1,'#a07450');}
+    else if(f.id==='digbox'&&layer==='back'){rect(x-8,56,17,6,'#8c6440');rect(x-8,56,17,1,'#b8875a');rect(x-7,55,15,2,'#6b4c32');for(let i=-6;i<=6;i+=3)rect(x+i,54+(i&1),2,1,i%2?'#f6f3ea':'#d9c25e');rect(x-8,61,17,1,'#5e4430');}
+    else if(f.id==='hayball'&&layer==='back'){S.kick=S.kick||{};const kk=S.kick.hayball?Math.min(1,(performance.now()-S.kick.hayball)/1500):1;const bx2=Math.round(x+Math.sin(kk*Math.PI)*7),by2=56-Math.round(Math.sin(kk*Math.PI)*4);rect(bx2-2,by2,5,5,'#d9c25e');rect(bx2-1,by2-1,3,1,'#d9c25e');rect(bx2-1,by2+5,3,1,'#d9c25e');rect(bx2-1,by2+1,1,3,'#b8875a');rect(bx2+1,by2+1,1,3,'#b8875a');rect(bx2-2,by2+2,5,1,'#b8875a');}
+    else if(f.id==='plush'&&layer==='back'){rect(x-7,57,13,4,'#e8833a');rect(x-6,56,11,1,'#f2a25e');rect(x-8,58,1,2,'#e8833a');for(let i=-4;i<=4;i+=3)rect(x+i,58,1,2,'#c96a2a');rect(x+6,56,2,2,'#5f9e45');rect(x+7,54,2,2,'#5f9e45');rect(x+8,57,2,2,'#5f9e45');rect(x-5,58,1,1,INK);rect(x-2,58,1,1,INK);}
+    else if(f.id==='ring'&&layer==='back'){rect(x-3,29,7,2,'#5e4430');rect(x-3,29,7,1,'#8c6440');rect(x,31,1,13,'#8c6440');for(let a=0;a<16;a++){const an=a/16*Math.PI*2;rect(Math.round(x+Math.cos(an)*4),Math.round(48+Math.sin(an)*4),1,1,a%3?'#b8875a':'#8fbf6a');}rect(x-1,43,3,1,'#5e4430');}
     else if(f.id==='tunnel'){const occ=visible().some(r=>{const v=vis(r);return Math.abs(v.x-x)<7&&(v.act==='loaf'||v.pose==='loaf');});
       for(let y=52;y<=61;y++){const dy=61-y,wo=Math.round(Math.sqrt(Math.max(0,90-dy*dy))),wi=dy<6?Math.round(Math.sqrt(Math.max(0,36-dy*dy))):-1;
         if(layer==='back'){rect(x-wo,y,wo*2+1,1,'#b8875a');if(wi>=0)rect(x-wi,y,wi*2+1,1,'#3b3028');rect(x-wo,y,1,1,INK);rect(x+wo,y,1,1,INK);}
         else if(occ){rect(x-wo,y,wo-wi,1,'#b8875a');rect(x+wi+1,y,wo-wi,1,'#b8875a');rect(x-wo,y,1,1,INK);rect(x+wo,y,1,1,INK);}}
       if(layer==='back'||occ){rect(x-3,52,7,1,INK);for(let k=-6;k<=6;k+=4)rect(x+k,54+Math.abs(k)/3,1,1,'#8c6440');}}}
 }
+const TOYS=['castle','digbox','hayball','plush','ring','ball','tunnel','cushion','chew'];
+function favToy(r){const c=[];if(r.tr.active>=58)c.push('digbox','hayball');if(r.tr.brave<=42)c.push('castle','tunnel');if(r.tr.cuddly>=58)c.push('plush','cushion');if(r.tr.naughty>=58)c.push('ring','digbox');if(!c.length)c.push(...TOYS);return c[(r.seed>>>0)%c.length];}
 function furnScript(r){
-  const L=(S.furn||[]);if(!L.length)return null;const f=L[ri(0,L.length-1)];
+  const L=(S.furn||[]);if(!L.length)return null;const fav=L.find(f=>f.id===favToy(r));const f=fav&&Math.random()<.6?fav:L[ri(0,L.length-1)];
+  if(fav&&f===fav&&isMain(r)){const t=now();if(t-(r.favAt||0)>45*MIN){r.favAt=t;r.happy=Math.min(4,r.happy+1);const v=vis(r);setTimeout(()=>{FX.push({k:'heart',x:v.x,y:v.y-20,life:1.4});if(mode==='main')cap(`${r.name}在玩它最喜欢的${SHOPI[f.id]?SHOPI[f.id].n:'玩具'}，好开心`,4);},2500);}}
   if(f.id==='cushion')return[{go:f.x,a:'flop'}];
   if(f.id==='tunnel')return[{go:f.x,a:'loaf'},{a:'loaf'}];
   if(f.id==='ball'){S.ballKick=performance.now()+1200;return[{go:f.x-7,a:'hop'},{a:'binky'}];}
   if(f.id==='chew')return[{go:f.x-6,a:'eat',o:{item:'hay'}}];
   if(f.id==='house')return[{go:f.x,a:'loaf'},{a:'loaf'}];
+  if(f.id==='castle')return[{go:f.x,a:'loaf'},{a:'look'},{a:'loaf'}];
+  if(f.id==='digbox')return[{go:f.x-9,a:'dig'},{a:'dig'}];
+  if(f.id==='hayball'){S.kick=S.kick||{};S.kick.hayball=performance.now()+1200;return[{go:f.x-7,a:'hop'},{a:'binky'}];}
+  if(f.id==='plush')return[{go:f.x-9,a:'flop'},{a:'melt'}];
+  if(f.id==='ring')return[{go:f.x-6,a:'beg'},{a:'chewdo'}];
   if(f.id==='hayrack')return[{go:f.x-8,a:'eat',o:{item:'hay'}}];
   if(f.id==='platform')return[{go:f.x-9,a:'highjump'},{a:'binky'}];
   if(f.id==='hurdle')return[{go:f.x-9,a:'highjump'}];
@@ -3620,7 +3674,7 @@ const SP_MEDAL=['🥇','🥈','🥉'];
 /* —— 运动会本体 —— */
 function sportMeet(o){
   const m=mainR();const meU=o.me||'me';const gid=o.gid||null;
-  const humans=o.humans.map(h=>({u:h.uid||h.u,nm:h.nm,g:typeof h.g==='string'?strG(h.g):h.g,sd:h.sd,ac:h.ac||null,my:h.my||0,st:h.st||'adult',own:h.nk||'',k:(h.uid||h.u)===meU?'me':'fr',raw:h}));
+  const humans=o.humans.map(h=>({u:h.uid||h.u,nm:h.nm,g:typeof h.g==='string'?strG(h.g):h.g,sd:h.sd,ac:h.ac||null,my:h.my||0,out:h.out||null,st:h.st||'adult',own:h.nk||'',k:(h.uid||h.u)===meU?'me':'fr',raw:h}));
   const used=new Set(humans.map(h=>h.nm));
   const C=humans.concat(sportAIs(o.seed,Math.max(0,5-humans.length),used).map(a=>Object.assign(a,{k:'ai',own:'电脑兔'})));
   const MY=C.findIndex(c=>c.k==='me');const ab=myAb(m);const evs=o.evs;
@@ -3741,7 +3795,7 @@ function spDrawLanes(G,C,MY,id){const D=id==='sprint'?60:80,PX=4;const me=G.st(M
   for(let j=0;j<C.length;j++){const c=C[j],s=S2[j],yb=spLaneY(j);const x=Math.round(s.x*PX-cam);
     if(x<6){rect(2,yb-5,1,3,INK);rect(1,yb-4,1,1,INK);rect(3,yb-6,1,5,INK);continue;}
     if(x>W-6){rect(W-3,yb-5,1,3,INK);rect(W-2,yb-4,1,1,INK);rect(W-4,yb-6,1,5,INK);continue;}
-    const sp=rabbitSprite(c.g,c.sd,s.p,'open',{s:.55,hb:1.12,ef:.9});drawSprite(sp,x,yb-s.y,1,c.k==='fr'?.92:1);drawWear(c.ac,c.my,s.p,x,yb-s.y,1,{s:.55,hb:1.12,ef:.9});
+    const sp=rabbitSprite(c.g,c.sd,s.p,'open',{out:c.out,s:.55,hb:1.12,ef:.9});drawSprite(sp,x,yb-s.y,1,c.k==='fr'?.92:1);drawWear(c.ac,c.my,s.p,x,yb-s.y,1,{s:.55,hb:1.12,ef:.9});
     if(j===MY)bm('arrow',x-2,yb-s.y-15);}
   rect(0,0,22,7,'rgba(246,243,234,.8)');const tm=(G.ph==='count'?0:G.E.done&&G.E.sc!=null?G.E.sc:G.et).toFixed(1);digits(tm,2,1,INK);
   if(id==='hurdle'&&G.E.f){for(let i=0;i<G.E.f;i++)rect(24+i*3,2,2,3,'#d9485a');}}
@@ -3757,7 +3811,7 @@ function spDrawHigh(G,C,MY){const e=G.E;const c=C[MY];spSky(0);spStands(0,9);rec
   else if(e.ph==='jump'){const t=e.pt;if(t<.45){x=30+t/.45*22;p=(t*6)%1<.6?'hop':'sit';}else if(t<1.1){const q=(t-.45)/.65;x=52+q*20;const peak=e.clr?Math.round(e.jh*.3)+2:Math.max(4,bh-3);y=50-Math.round(Math.sin(q*Math.PI)*peak);p='hop';}else{x=72;y=46;p='sit';}}
   else if(e.ph==='show'){x=e.clr?72:62;y=e.clr?46:50;p=e.clr?'sit':'thump';}
   else if(e.done){x=72;y=46;p='sit';}
-  const sp=rabbitSprite(c.g,c.sd,p,'open',{s:.75,hb:1.08,ef:.95});drawSprite(sp,Math.round(x),Math.round(y),dir);drawWear(c.ac,c.my,p,Math.round(x),Math.round(y),dir,{s:.75,hb:1.08,ef:.95});
+  const sp=rabbitSprite(c.g,c.sd,p,'open',{out:c.out,s:.75,hb:1.08,ef:.95});drawSprite(sp,Math.round(x),Math.round(y),dir);drawWear(c.ac,c.my,p,Math.round(x),Math.round(y),dir,{s:.75,hb:1.08,ef:.95});
   if(e.ph==='aim'&&!e.done){rect(3,12,6,38,INK);rect(4,13,4,36,'#efe6cf');const nd=clamp(e.need(),0,1);if(nd<1){const zy=13+Math.round(36*(1-nd));rect(4,13,4,Math.max(2,zy-13+1),'#8fd06a');}else{for(let y=13;y<49;y+=2)rect(4,y,4,1,'#e7a2ab');}
     const my=13+Math.round(35*(1-e.pos));rect(2,my,8,1,'#d9485a');rect(10,my-1,1,3,'#d9485a');}
   rect(30,1,36,7,'rgba(246,243,234,.8)');const hs=String(HJ[k]);digits(hs,33,2,INK);for(let i=0;i<2;i++)rect(52+i*4,3,3,3,i<e.att?'#d9485a':i===e.att&&!e.done?INK:'#c9c3cf');
@@ -3767,14 +3821,14 @@ function spDrawLong(G,C,MY){const e=G.E;const c=C[MY];const PX=6;const cam=clamp
   const bx0=Math.round(12*PX-cam);rect(bx0,48,2,4,'#f6f3ea');rect(bx0+2,48,Math.round(4.8*PX),5,'#e8d39a');
   for(let d=50;d<=450;d+=50){const x=Math.round((12+d/100)*PX-cam);rect(x,53,1,d%100?1:2,'#a0864e');if(d%100===0&&x-1>=0&&x+2<W){const s=String(d/100);digits(s,x-1,56,'#7a6a3e');}}
   for(const r of e.res)if(r>0){const x=Math.round((12+r/100)*PX-cam);rect(x-1,48,3,1,'#7a6a3e');}
-  const[p,lift]=e.pose();const sp=rabbitSprite(c.g,c.sd,p,'open',{s:.7,hb:1.08,ef:.95});drawSprite(sp,Math.round(e.x*PX-cam),48-lift,1);drawWear(c.ac,c.my,p,Math.round(e.x*PX-cam),48-lift,1,{s:.7,hb:1.08,ef:.95});
+  const[p,lift]=e.pose();const sp=rabbitSprite(c.g,c.sd,p,'open',{out:c.out,s:.7,hb:1.08,ef:.95});drawSprite(sp,Math.round(e.x*PX-cam),48-lift,1);drawWear(c.ac,c.my,p,Math.round(e.x*PX-cam),48-lift,1,{s:.7,hb:1.08,ef:.95});
   rect(0,0,40,7,'rgba(246,243,234,.8)');digits(`${Math.min(3,e.att+1)}/3`,2,1,INK);if(e.best)digits(String(e.best),18,1,'#2f8a7a');spBars(G,C,MY);}
 function spDrawEat(G,C,MY){const e=G.E;const c=C[MY];rect(0,0,W,H,'#bfe0ef');rect(0,44,W,20,'#8fbf6a');rect(0,44,W,1,'#5f9e45');
   for(let x=4;x<W;x+=11)rect(x,50+(x%3),1,2,'#5f9e45');
   rect(0,1,W,10,'#efe6cf');rect(0,11,W,1,'#d8cdb2');rect(9,2,9,8,e.fx>0&&e.chew>.1?'#8fd06a':e.fx<0&&e.chew>.05?'#e7a2ab':'#efe6cf');rect(9,2,9,1,INK);rect(9,9,9,1,INK);rect(9,2,1,8,INK);rect(17,2,1,8,INK);
   for(let i=0;i<34;i++){const bt=EAT_B0+i*EAT_BP;const dx=(bt-e.t)*36;if(dx<-6||dx>W)continue;const x=Math.round(13+dx);rect(x-1,5,3,2,e.bit[i]?'#5f9e45':'#d9485a');rect(x,4,1,4,e.bit[i]?'#5f9e45':'#d9485a');}
   const L=Math.max(3,Math.round(34*(1-Math.min(1,e.g/230))));rect(46,40,L,5,'#e8833a');rect(46,41,L,1,'#f2a25e');for(let i=6;i<L;i+=6)rect(46+i,42,1,2,'#c96a2a');rect(46+L,38,2,3,'#5f9e45');rect(46+L+2,36,2,3,'#5f9e45');rect(46+L,41,3,2,'#5f9e45');
-  const p=e.cough>0?(Math.floor(e.t*8)%2?'thump':'sit'):e.chew>0?'eat':'sit';const sp=rabbitSprite(c.g,c.sd,p,'open',{s:1,hb:1,ef:1});drawSprite(sp,34,56,1);drawWear(c.ac,c.my,p,34,56,1,{s:1,hb:1,ef:1});
+  const p=e.cough>0?(Math.floor(e.t*8)%2?'thump':'sit'):e.chew>0?'eat':'sit';const sp=rabbitSprite(c.g,c.sd,p,'open',{out:c.out,s:1,hb:1,ef:1});drawSprite(sp,34,56,1);drawWear(c.ac,c.my,p,34,56,1,{s:1,hb:1,ef:1});
   if(e.cough>0){rect(46,30,1,1,INK);rect(48,28,1,1,INK);rect(50,31,1,1,INK);}
   const gs=String(Math.round(e.g));rect(52,13,24,8,'rgba(246,243,234,.8)');digits2(gs,54,14,INK);
   const tl=String(Math.max(0,Math.ceil(EAT_T-e.t)));digits(tl,2,14,INK);for(let i=0;i<3;i++)rect(2+i*3,21,2,2,i<e.choke?'#d9485a':'#c9c3cf');
@@ -3783,7 +3837,7 @@ function spDrawPodium(G,C){const t=G.t;spSky(t*4);spStands(t*4,9);rect(0,16,W,48
   const L=G.final;const spot=[[48,22,'#e3b341'],[22,15,'#c9c3cf'],[74,10,'#c96a2a']];
   for(let k=0;k<3;k++){const[x,h,col]=spot[k];rect(x-10,63-h,21,h+1,col);rect(x-10,63-h,21,1,'#f6f3ea');digits(String(k+1),x-1,63-h+3,INK);}
   const pos=[0,0,0];for(const r of L){if(r.rk>3)continue;const k=r.rk-1;const[x,h]=spot[k];const n=pos[k]++;const xx=x+(n?(n%2?-6:6):0);const c=r.c;
-    const hop=k===0&&(t*2)%1<.4;const sp=rabbitSprite(c.g,c.sd,hop?'hop':'sit','open',{s:.7,hb:1.08,ef:.95});drawSprite(sp,xx,63-h-(hop?3:0),xx<48?1:-1);
+    const hop=k===0&&(t*2)%1<.4;const sp=rabbitSprite(c.g,c.sd,hop?'hop':'sit','open',{out:c.out,s:.7,hb:1.08,ef:.95});drawSprite(sp,xx,63-h-(hop?3:0),xx<48?1:-1);
     if(k===0)bm('crown',xx-3,63-h-(hop?3:0)-15);}
   for(let i=0;i<14;i++){const x=((i*37+Math.floor(t*20)*(i%3+1))%W);const y=((i*23+t*18*(1+i%3))%46)+2;rect(x,Math.round(y),1,2,SP_CROWD[i%6]);}}
 
@@ -3880,7 +3934,7 @@ function trainMenu(r,back){const s=sportOf(r);
   return menu(`${r.name}的训练`,()=>TRAIN.map(x=>({t:x.n,s:`${SP_STN[x.id]} ${Math.floor(s[x.id])}/${SP_MAX} 级`,dis:trainBlock(r,x),h:x.d+(fitOf(r)<FIT_MAX?`（${ageText(fitNext(r)/MIN)}后体力 +1）`:'（体力满了）'),on:()=>setScreen(trainScreen(r,x,back))})).concat(['energy','vitamin'].filter(id=>owned(id)).map(id=>({t:'吃'+SHOPI[id].n,s:`有${owned(id)}个`,h:SHOPI[id].d,on:()=>useSport(r,id)}))),back||null,`体力 ${fitDots(r)}${s.boost?` · 加倍${s.boost}次`:''}`);}
 function trainScreen(r,x,back){const ab=myAb(r);const s=sportOf(r);const ctx={hs:hurdlePos(ri(1,1e9))};
   if(x.ev==='high'){const i=HJ.indexOf(hjTop(ab));ctx.k0=Math.max(0,i-3);ctx.kn=5;}
-  const C=[{u:'me',nm:r.name,g:r.g,sd:r.seed,ac:r.acc||null,my:r.myopia?1:0,k:'me'}];const done=()=>{sndClick();setScreen(trainMenu(r,back));};
+  const C=[{u:'me',nm:r.name,g:r.g,sd:r.seed,ac:r.acc||null,my:r.myopia?1:0,out:r.out||null,k:'me'}];const done=()=>{sndClick();setScreen(trainMenu(r,back));};
   const T={name:'mp',fastBtn:1,ph:'count',pt:0,t:0,et:0,acc:0,E:SPE[x.ev](ab,ctx),ctx,res:null,
     ev(){return SPN[x.ev];},st(){const[p,y]=this.E.pose();return{x:this.E.x,p,y,fell:{}};},cur(){return this.E.cur();},
     A(){if(this.ph==='play')this.E.press('A');},
@@ -4028,7 +4082,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
