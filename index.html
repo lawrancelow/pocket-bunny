@@ -131,7 +131,7 @@ body{background:radial-gradient(ellipse 80% 60% at 50% 45%,var(--page-hi),transp
 'use strict';
 /* ================= constants ================= */
 const W=96,H=64,MIN=60000;
-const NEST_EYES=180,NEST_END=360,KIT_END=1440,JUN_END=4320,ELDER_AT=14400;
+const NEST_EYES=180,NEST_END=360,KIT_END=1440,JUN_END=4320,ELDER_AT=22*1440,LIFE_MIN=30,LIFE_MAX=38;
 const PREG_NEST=1200,PREG_LEN=1440,NURSE=1440,CAP=8;
 const INK='#2a2722',LCDC='#cfd7b8',NIGHT_INK='#e5ebd2';
 const KEY='pocketBunny.v2';
@@ -251,8 +251,8 @@ function uniquePersona(mom,dad,taken){let p;for(let i=0;i<60;i++){p=genPersona(m
 let S=null,DBG=0;
 const now=()=>Date.now()+DBG;
 function fresh(){return{v:2,t:Math.floor(now()/MIN)*MIN,nextId:1,nextNest:1,rabbits:[],mainId:null,prevMain:null,nests:[],poops:[],dirtySince:0,light:true,calls:{},sitter:null,suitors:null,sound:true,log:[],dex:{},hist:{},seen:{},moonQ:[],tut:0,started:false,best:{},shell:'lavender',nick:'',usedCodes:[],myCodes:[],album:[],treasures:{},sup:{last:{}},decor:{},pendQ:[],gift:null};}
-function migrate(){for(const r of S.rabbits){if(!r.uid)r.uid=rid();}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
-function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(o&&o.v===2){S=Object.assign(fresh(),o);migrate();return;}}}catch(e){}S=fresh();}
+function migrate(){if((S.lifeV||1)<2){S.lifeV=2;const t=now();for(const r of S.rabbits){if(r.life!=null)r.life=clamp(r.life+18,LIFE_MIN,LIFE_MAX);if(r.stage==='elder'&&(t-r.born)/MIN<ELDER_AT)r.stage='adult';}}for(const r of S.rabbits){if(!r.uid)r.uid=rid();}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
+function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(o&&o.v===2){S=Object.assign(fresh(),o);migrate();return;}}}catch(e){}S=fresh();S.lifeV=2;}
 function save(){if(window.__noSave)return;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}try{netBackup();}catch(e){}try{netMark();}catch(e){}}
 const byId=id=>S.rabbits.find(r=>r.id===id);
 const mainR=()=>S.mainId==null?null:byId(S.mainId)||null;
@@ -265,7 +265,7 @@ function pickName(extra){const u=new Set(S.rabbits.map(r=>r.name));if(extra)for(
 function newRabbit(o){
   const p=o.p||genPersona();
   return{id:S.nextId++,uid:rid(),ancU:[],name:o.name||pickName(),sex:o.sex||(Math.random()<.5?'m':'f'),g:o.g,born:o.born,stage:o.stage,gen:o.gen||1,mom:o.mom??null,dad:o.dad??null,temp:!!o.temp,
-    tr:{...p.tr},quirk:p.quirk,fav:p.fav,hate:p.hate,life:o.life||rand(12,18),
+    tr:{...p.tr},quirk:p.quirk,fav:p.fav,hate:p.hate,life:o.life||rand(31,35),
     hunger:3,happy:3,disc:o.disc??0,weight:IDEAL[o.stage]??60,fiber:4,sugar:[],sick:null,tm:{h:0,p:0,poop:rand(0,40),f:0},calls:{},mt:0,mk:0,care:{pets:0,plays:0,snacks:0,wrong:0},
     shaped:o.stage==='adult'||o.stage==='elder',cold:0,lastPet:0,petN:0,mis:null,scared:0,zh:0,sm:0,fz:0,preg:null,nurse:0,partner:null,bond:0,seed:ri(1,999999),nestId:o.nestId??null,wasAsleep:false};
 }
@@ -329,7 +329,7 @@ function grow(r,to,t){
   const old=IDEAL[r.stage]||300;r.stage=to;r.weight=Math.max(Math.round(IDEAL[to]*.7),Math.round(IDEAL[to]+(r.weight-old)*.5));
   if(isMain(r)){
     let extra='';
-    if(to==='adult'&&!r.shaped){extra=shape(r);r.shaped=true;r.life=clamp(r.life+(r.mt<=3?2:r.mt<=8?0:-2),10,20);}
+    if(to==='adult'&&!r.shaped){extra=shape(r);r.shaped=true;r.life=clamp(r.life+(r.mt<=3?3:r.mt<=8?0:-1),LIFE_MIN,LIFE_MAX);}
     const m=`${r.name}长成${STAGE_N[to]}了！${extra}`;log(t,m);emit(m,'evolve');
     if(LIVE)FX.push({k:'sparkle',id:r.id,life:1.6});
   }else log(t,`${r.name}长成${STAGE_N[to]}了`);
@@ -1284,7 +1284,7 @@ function takeSuitor(i){
   const t=now(),m=mainR(),o=S.suitors.list.splice(i,1)[0];
   let nm=o.name;if(S.rabbits.some(r=>r.name===nm))nm=pickName();
   const born=t-o.days*1440*MIN;
-  const r=newRabbit({g:o.g,sex:o.sex,born,stage:o.days*1440>=ELDER_AT?'elder':'adult',p:o.p,name:nm,disc:60,life:rand(Math.max(12,o.days+8),18)});
+  const r=newRabbit({g:o.g,sex:o.sex,born,stage:o.days*1440>=ELDER_AT?'elder':'adult',p:o.p,name:nm,disc:60,life:rand(Math.max(31,o.days+8),35)});
   const isNew=!S.dex[phen(r.g).key];addHouse(r);
   m.partner=r.id;r.partner=m.id;m.bond=0;histOf(m);histOf(r);S.suitors=null;save();toMain();
   cap(`${r.name}搬进来了！它们要先培养感情${isNew?'（图鉴新增一种毛色）':''}`,5);sndOk();log(t,`${r.name}搬来和${m.name}一起住`);
@@ -1313,7 +1313,7 @@ function resetMenu(){
   const back=()=>setScreen(resetMenu());
   return menu('重置',[
     {t:'重新挑一只兔宝宝',s:'保留图鉴和家谱',h:'现在家里的兔子都会离开，再去邻居家重新挑一只',on:()=>setScreen(confirmScr('重新挑兔宝宝',`家里现在的${household().length}只兔子都会离开，然后重新挑一只兔宝宝。<br>图鉴、家谱、兔语和最高纪录会保留。`,()=>resetPet(),back))},
-    {t:'全部清空重来',s:'什么都不留',h:'兔子、家谱、图鉴、兔语、纪录全部清空',on:()=>setScreen(confirmScr('全部清空',`兔子、家谱、图鉴、兔语、最高纪录全部清空，无法恢复。`,()=>{const sh=S.shell;try{localStorage.removeItem(KEY);}catch(e){}S=fresh();S.shell=sh;VIS.clear();FX.length=0;save();toMain();showStart();},back))}
+    {t:'全部清空重来',s:'什么都不留',h:'兔子、家谱、图鉴、兔语、纪录全部清空',on:()=>setScreen(confirmScr('全部清空',`兔子、家谱、图鉴、兔语、最高纪录全部清空，无法恢复。`,()=>{const sh=S.shell;try{localStorage.removeItem(KEY);}catch(e){}S=fresh();S.lifeV=2;S.shell=sh;VIS.clear();FX.length=0;save();toMain();showStart();},back))}
   ],()=>setScreen(bookMenu()));
 }
 function resetPet(){
@@ -2900,7 +2900,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.29a';
+const GAME_VER='2026.10.29b';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -2942,7 +2942,7 @@ async function recoverByCode(raw){
   const main=L.find(e=>e.s&&e.s.mn)||L[0];const names=L.map(e=>e.p.nm).join('、');
   setScreen(confirmScr('找回兔子',`找到了：<b>${esc(names)}</b><br>（${esc(String(pl.nick||'兔主人'))}，${new Date(pl.at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 的记录）<br>要把它们带回来吗？`,()=>{
     const keepNet=S.net,nick=S.nick||pl.nick||'';const t=now();const passed=Math.max(0,(Date.now()-(pl.at||Date.now()))/MIN);
-    S=fresh();S.net=keepNet;S.nick=nick;S.started=true;S.tut=-1;S.firstPlay=Date.now();
+    S=fresh();S.lifeV=2;S.net=keepNet;S.nick=nick;S.started=true;S.tut=-1;S.firstPlay=Date.now();
     let mr=null;
     for(const e of L){const p=unpackR(e.p);const ageMin=p.age+passed;
       const r=newRabbit({g:p.g,sex:p.sex,born:t-ageMin*MIN,stage:(e.s&&e.s.st)||p.stage,p:p.p,name:p.name,gen:p.gen,disc:60});
