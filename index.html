@@ -443,7 +443,7 @@ const compatHearts=(a,b)=>{const n=clamp(Math.round((compat(a,b)-40)/12),1,5);re
 function stepMinute(t){
   S.t=t;
   const sit=!!(S.sitter&&S.sitter.until>t);
-  if(S.sitter&&S.sitter.until<=t){log(t,'邻居阿姨把兔子交还给你了');emit('邻居阿姨把兔子交还给你了','good');S.sitter=null;}
+  if(S.sitter&&S.sitter.until<=t){log(t,'邻居阿姨把兔子交还给你了');emit('邻居阿姨把兔子交还给你了','good');sitterEnd(t);}
   for(const r of household()){
     if(!S.rabbits.includes(r))continue;
     stepAge(r,t);if(!S.rabbits.includes(r))continue;
@@ -1230,7 +1230,7 @@ function familyMenu(){
     }
     L.push({t:'朋友联机',s:'兔子码',h:'串门、相亲、送礼物、送宝宝',on:()=>setScreen(netMenu())});
     const sit=S.sitter&&S.sitter.until>t;
-    L.push(sit?{t:'接兔子回来',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('接兔子回来','现在就从邻居阿姨家把兔子们接回来？',()=>{S.sitter=null;save();cap('你把兔子们接回来了！');sndOk();toMain();},()=>setScreen(familyMenu())))}:{t:'请邻居照顾',s:'出门时用',h:'出门或睡觉前托管：兔子们会去邻居家，时间到了送回来',on:()=>setScreen(sitterMenu())});
+    L.push(sit?{t:'接兔子回来',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('接兔子回来','现在就从邻居阿姨家把兔子们接回来？',()=>{sitterEnd();save();cap('你把兔子们接回来了！');sndOk();toMain();},()=>setScreen(familyMenu())))}:{t:'请邻居照顾',s:'出门时用',h:'出门或睡觉前托管：兔子们会去邻居家，时间到了送回来',on:()=>setScreen(sitterMenu())});
     return L;};
   return menu('家族',items,null,`${household().length}/${CAP}只`,true);
 }
@@ -1294,7 +1294,7 @@ function giveAway(o){
   if(m&&m.partner===o.id){m.partner=null;m.bond=0;}
   log(t,`${o.name}被送去好人家了`);VIS.delete(o.id);save();toMain();cap(`${o.name}去了新家，会被好好疼爱的`);
 }
-function sitterMenu(){return menu('请邻居照顾',[2,4,6,8,10].map(h=>({t:`${h}小时`,s:'喂饭、打扫、看病',on:()=>{S.sitter={until:now()+h*60*MIN};save();toMain();cap(`邻居阿姨把兔子们接走了，${h}小时后送回来。这段时间不会算照顾失误`,5);}})),()=>setScreen(familyMenu()));}
+function sitterMenu(){return menu('请邻居照顾',[2,4,6,8,10].map(h=>({t:`${h}小时`,s:'喂饭、打扫、看病',on:()=>{S.sitter={at:now(),until:now()+h*60*MIN};S.sitMeetQ=null;save();try{netPublish(true);}catch(e){}toMain();cap(`邻居阿姨把兔子们接走了，${h}小时后送回来。这段时间不会算照顾失误`,5);}})),()=>setScreen(familyMenu()));}
 function renameScr(r,back){return{name:'rename',idx:0,hint(){return this.idx===0?'输入新名字后按 B 确定 · C 返回':'按 B 返回';},A(){this.idx=1-this.idx;renderUI();},
   B(){if(this.idx===1){back();return;}const inp=ui.querySelector('input');const v=(inp&&inp.value||'').trim().slice(0,8);if(!v){cap('名字不能是空的');sndNo();return;}if(S.rabbits.some(o=>o!==r&&o.name===v)){cap('已经有兔子叫这个名字了');sndNo();return;}r.name=v;histOf(r);save();sndOk();cap(`现在它叫${v}了`);back();},
   C(){back();},html(){return`<div class="panel"><div class="ttl">给${esc(r.name)}改名</div><div class="body"><p><label for="nm">新名字（最多8个字）</label></p><input id="nm" maxlength="8" value="${esc(r.name)}" autocomplete="off"><ul style="margin-top:.4em"><li class="${this.idx===0?'sel':''}" data-i="0">确定</li><li class="${this.idx===1?'sel':''}" data-i="1">返回</li></ul></div></div>`;},tap(i){if(i===0||i===1){const v=ui.querySelector('input');const keep=v&&v.value;this.idx=i;renderUI();const v2=ui.querySelector('input');if(v2&&keep!=null)v2.value=keep;}}};}
@@ -1348,7 +1348,7 @@ function helpScreen(){
     `<p>成年后可以在「家族」里找对象。两只都醒着、你的兔子开心时，感情会慢慢变好，满了就能配对。</p><p>怀孕约24小时，生下2～5只宝宝。毛色、耳朵、性格都会遗传。家里最多住8只。</p>`,
     `<p>要出门或睡觉前，可以在「家族」里请邻居照顾，最多10小时。这段时间不会算照顾失误。</p>`,
     `<p>「家族 → 朋友联机」可以和朋友互传兔子码：串门码让你的兔子去朋友家玩3小时、礼物码送礼、宝宝码送养兔子。</p><p>客人兔成年的话可以和你的兔子相亲。母兔那一方会生下宝宝，宝宝带着两家的血统。每个码只能用一次。</p>`,
-    `<p>你越用心照顾，兔子跟你越亲密（「状态」里看得到）。越亲密，它越常做出可爱的小举动，还会叼礼物给你。</p><p>特别的时刻会自动拍下来，放进「兔谱 → 回忆册」。</p><p><b>散步</b>：「玩耍 → 带它去散步」。路上遇到东西会停下来，按 B 去看看、A 继续走、C 提早回家。越亲密、去得越多，能去的地方越多。</p><p><b>出门</b>：兔子去朋友家串门、或托给邻居阿姨照顾时，会真的离开家，屏幕上会显示回来的倒数时间。想提早接回来，去「家族」里选「接回来」。</p><p><b>朋友簿</b>：收到过码的朋友都会记在「家族 → 朋友联机 → 朋友簿」。见过的朋友兔子可以直接「向它求亲」，也能约朋友的兔子赛跑，双方都看得到同一场比赛。</p><p><b>胡萝卜币和小店</b>：玩游戏、散步、梳毛剪指甲、每天照顾都会得到胡萝卜币，在「兔谱 → 小店」买零食、家具（兔子会自己去用）和饰品（戴在兔子身上，好友在公园也看得到）。</p><p><b>挖宝乐</b>：「玩耍 → 挖宝乐」。带兔子去樱花林、海边沙滩、枫叶山谷、雪原、星空花海挖宝。挖到空洞会出现数字，表示周围一圈还藏着几样宝物。挖到的衣服、饰品、墙饰、家具都可以自己用。</p><p><b>小店</b>：每样东西都可以先按 B 看看兔子穿上、或摆进房间的样子，喜欢再买。买过的衣服再买一件，可以在「小店 → 送礼给好友」送人。</p><p><b>兔舍</b>：兔舍比屏幕宽，兔子走到边上，画面会跟着它移过去；屏幕左右边缘闪小箭头，表示那边还有兔子。手指按住屏幕慢慢拖，兔子会跟着你的手指走。家具最多摆 5 件，靠墙放，兔子会绕到前面玩。</p><p><b>梳毛・剪指甲</b>：在「玩耍」里。换毛季（3、4、9、10月）毛掉得特别快，用手指在兔子身上来回刷；剪指甲要在剪刀对准白色部分时按 B，别剪到粉红色的血线。</p><p><b>天气</b>：窗外会下雨、打雷、起雾、出彩虹。打雷时胆小的兔子会害怕，要摸摸它；下雨要戴「小雨帽」才能散步。</p><p><b>留言・心意</b>：在「家族 → 好友」点好友，可以写纸条或送摸摸、抱抱。</p><p><b>和好友一起玩</b>：「玩耍」里有「约好友抢胡萝卜」（两人实时比赛）和「兔子公园」（遇到在线好友的兔子，A 丢胡萝卜、B 碰鼻子）。在「家族 → 好友」点好友，可以送今天的礼物，连续送三天会得到友情徽章。兔子去好友家住时，好友可以喂它、摸它，它回家会带回住宿报告。</p><p><b>好友（实时）</b>：在「家族 → 朋友联机 → 好友」拿你的好友码给朋友，对方加了以后，双方的兔子会实时出现在「找对象」里。可以直接约朋友的兔子去花园玩、求亲，对方手机会马上收到，两边一起看约会。要有网络才能用，没网络照样能养兔子。</p><p><b>兔子谈恋爱</b>：别人家的兔子来串门时，两只会自己玩在一起；在「家族」里点客人，选「一起去花园玩」约会。感情分四级：初识 → 玩伴 → 喜欢（会主动依偎）→ 相爱。到「相爱」才会在约会时交配，也才能向朋友的兔子求亲。相爱之后分开了，你的兔子会想念对方，屏幕下方会提醒你。</p><p><b>兔子生气了</b>：被冤枉骂、打针、摸太多次都会让它背对你。喂它最爱的零食马上就好；或者每隔一会儿轻轻摸它一下，摸三次它就会原谅你（一直狂点没用）。不理它的话，几分钟后也会自己消气。</p><p><b>日记</b>：兔子每晚会把这一天写成日记，在「兔谱 → 兔子日记」。</p><p><b>探险</b>：你离开四小时以上，胆大的兔子可能偷偷出门，寄回明信片和宝物。</p>`,
+    `<p>你越用心照顾，兔子跟你越亲密（「状态」里看得到）。越亲密，它越常做出可爱的小举动，还会叼礼物给你。</p><p>特别的时刻会自动拍下来，放进「兔谱 → 回忆册」。</p><p><b>散步</b>：「玩耍 → 带它去散步」。路上遇到东西会停下来，按 B 去看看、A 继续走、C 提早回家。越亲密、去得越多，能去的地方越多。</p><p><b>出门</b>：兔子去朋友家串门、或托给邻居阿姨照顾时，会真的离开家，屏幕上会显示回来的倒数时间。想提早接回来，去「家族」里选「接回来」。</p><p><b>朋友簿</b>：收到过码的朋友都会记在「家族 → 朋友联机 → 朋友簿」。见过的朋友兔子可以直接「向它求亲」，也能约朋友的兔子赛跑，双方都看得到同一场比赛。</p><p><b>胡萝卜币和小店</b>：玩游戏、散步、梳毛剪指甲、每天照顾都会得到胡萝卜币，在「兔谱 → 小店」买零食、家具（兔子会自己去用）和饰品（戴在兔子身上，好友在公园也看得到）。</p><p><b>挖宝乐</b>：「玩耍 → 挖宝乐」。带兔子去樱花林、海边沙滩、枫叶山谷、雪原、星空花海挖宝。挖到空洞会出现数字，表示周围一圈还藏着几样宝物。挖到的衣服、饰品、墙饰、家具都可以自己用。</p><p><b>小店</b>：每样东西都可以先按 B 看看兔子穿上、或摆进房间的样子，喜欢再买。买过的衣服再买一件，可以在「小店 → 送礼给好友」送人。</p><p><b>兔舍</b>：兔舍比屏幕宽，兔子走到边上，画面会跟着它移过去；屏幕左右边缘闪小箭头，表示那边还有兔子。手指按住屏幕慢慢拖，兔子会跟着你的手指走。家具最多摆 5 件，靠墙放，兔子会绕到前面玩。</p><p><b>梳毛・剪指甲</b>：在「玩耍」里。换毛季（3、4、9、10月）毛掉得特别快，用手指在兔子身上来回刷；剪指甲要在剪刀对准白色部分时按 B，别剪到粉红色的血线。</p><p><b>天气</b>：窗外会下雨、打雷、起雾、出彩虹。打雷时胆小的兔子会害怕，要摸摸它；下雨要戴「小雨帽」才能散步。</p><p><b>留言・心意</b>：在「家族 → 好友」点好友，可以写纸条或送摸摸、抱抱。</p><p><b>和好友一起玩</b>：「玩耍」里有「约好友抢胡萝卜」（两人实时比赛）和「兔子公园」（遇到在线好友的兔子，A 丢胡萝卜、B 碰鼻子）。在「家族 → 好友」点好友，可以送今天的礼物，连续送三天会得到友情徽章。兔子去好友家住时，好友可以喂它、摸它，它回家会带回住宿报告。</p><p><b>好友（实时）</b>：在「家族 → 朋友联机 → 好友」拿你的好友码给朋友，对方加了以后，双方的兔子会实时出现在「找对象」里。可以直接约朋友的兔子去花园玩、求亲，对方手机会马上收到，两边一起看约会。要有网络才能用，没网络照样能养兔子。</p><p><b>保姆带它们见面</b>：你家和好友家的兔子感情到 50 以上时，如果两家同一段时间都请了邻居阿姨照顾，两位阿姨会带它们见面一起玩。接兔子回来（或时间到送回来）以后打开游戏，就能看到它们在阿姨家院子玩的画面，感情也会变好。</p><p><b>兔子谈恋爱</b>：别人家的兔子来串门时，两只会自己玩在一起；在「家族」里点客人，选「一起去花园玩」约会。感情分四级：初识 → 玩伴 → 喜欢（会主动依偎）→ 相爱。到「相爱」才会在约会时交配，也才能向朋友的兔子求亲。相爱之后分开了，你的兔子会想念对方，屏幕下方会提醒你。</p><p><b>兔子生气了</b>：被冤枉骂、打针、摸太多次都会让它背对你。喂它最爱的零食马上就好；或者每隔一会儿轻轻摸它一下，摸三次它就会原谅你（一直狂点没用）。不理它的话，几分钟后也会自己消气。</p><p><b>日记</b>：兔子每晚会把这一天写成日记，在「兔谱 → 兔子日记」。</p><p><b>探险</b>：你离开四小时以上，胆大的兔子可能偷偷出门，寄回明信片和宝物。</p>`,
     `<p>「玩耍」里有7个小游戏：猜方向、跳栏赛、接零食、打地鼠、跟我做、兔子长龙、俄罗斯方块。</p><p>玩得好兔子会更开心，活泼的兔子开心得更多。每个游戏都会记最高纪录。玩到一半想离开，点下面那行提示字就行。</p><p><b>兔子图书馆</b>：在「玩耍」里。看「学把戏」的书看满几次能学会新把戏；看「静心」的书会消气，脾气也会慢慢变好（兔子生气时也能带它去）；还能玩躲猫猫。连续看太多书眼睛会累，太累还继续看可能会近视，以后都要戴小眼镜。</p><p><b>兔子运动会</b>：冲刺跑、障碍赛、跳高、跳远、啃胡萝卜五个项目。可以和电脑兔比，也能约最多4位好友同场（最多5只，空位由电脑兔补上）。「兔子训练」可以练速度、弹跳、食量（体力最多存12点，每40分钟恢复1点，上班回来刚好存满），练得越高比赛越容易赢。五项总冠军拿金牌和奖杯。</p>`
   ],()=>setScreen(bookMenu()));
 }
@@ -2577,12 +2577,13 @@ function dateP(r){return{g:r.g,sd:r.seed,nm:r.name,sex:r.sex};}
 function dateK(p){return{g:strG(p.g),sd:p.sd,nm:p.nm,sex:p.sx==='f'?'f':'m'};}
 const DATE_PH=[[0,'见面'],[3,'玩耍'],[9.5,'依偎'],[14,'求爱'],[15.4,'交配'],[18.2,'倒下'],[19.6,'温存'],[22,'回家'],[25.5,'end']];
 const DATE_SEG={mate:[[0,0,25.5]],cuddle:[[0,0,14],[14,19.6,2.4],[16.4,22,3.5]],play:[[0,0,9.5],[9.5,22,3.5]]};
-function dateScreen(X,Y,seed,title,onEnd,lvl){
+function dateScreen(X,Y,seed,title,onEnd,lvl,opt){opt=opt||{};
   lvl=lvl||'mate';const SEG=DATE_SEG[lvl],TOT=SEG[SEG.length-1][0]+SEG[SEG.length-1][2];
   const F=X.sex==='f'?X:Y,Mm=X.sex==='f'?Y:X;
   const rnd=mulberry((seed>>>0)||1);const flowers=[];for(let i=0;i<22;i++)flowers.push([Math.floor(rnd()*92)+2,44+Math.floor(rnd()*18),Math.floor(rnd()*4),rnd()*6]);
   const bfl=[0,1].map(i=>({ph:rnd()*6,y:16+i*7}));
   const lines={见面:`${F.nm}和${Mm.nm}在花园见面了`,玩耍:`${F.nm}和${Mm.nm}一起追来追去`,依偎:`它们靠在一起，互相舔舔毛`,求爱:`${Mm.nm}绕到${F.nm}身后`,交配:`${Mm.nm}爬上${F.nm}的背，交配中`,倒下:`交配完，${Mm.nm}往旁边一倒（真兔子就是这样）`,亲热:`♥ ${F.nm}和${Mm.nm}在一起了 ♥`,温存:`它们依偎着，好幸福`,回家:`约会结束，各自回家啦`};
+  if(opt.where==='sitter')Object.assign(lines,{见面:`两位保姆阿姨带着${X.nm}和${Y.nm}见面了`,玩耍:`${X.nm}和${Y.nm}在阿姨家的院子里追来追去`,依偎:`它们靠在一起，互相舔舔毛`,温存:`玩累了，它们挨着睡了一会儿`,回家:`阿姨们带它们各自回家了`});
   capUntil=0;const S2={name:'date',t:0,ph:'见面',ended:false,hearts:[],lvl,
     vt(){const t=Math.min(this.t,TOT-.01);let v=t;for(const[r0,v0,len]of SEG)if(t>=r0&&t<r0+len)v=v0+(t-r0);return v;},
     hint(){return this.ended?`${title}\n按 B 继续`:`${lines[this.ph]||''}\nC 跳过`;},
@@ -2613,6 +2614,7 @@ function dateScreen(X,Y,seed,title,onEnd,lvl){
       for(let i=0;i<3;i++)bm('cloud',Math.round((i*38+t*2.5)%130)-20,4+i*3,night?'#7d86a8':null);
       for(let x=0;x<W;x++){const y=Math.round(23+Math.sin(x/6)*2+Math.sin(x/2.3));rect(x,y,1,30-y,'#6f9a52');}
       rect(0,30,W,34,'#8fbf6a');
+      if(opt.where==='sitter')drawAunties(t);
       for(let x=12;x<84;x+=5){rect(x,31,3,10,'#f6f3ea');rect(x+1,30,1,1,'#f6f3ea');rect(x,31,1,10,'#d8d2c2');}rect(10,33,76,1,'#d8d2c2');rect(10,38,76,1,'#d8d2c2');
       for(const gx of[0,86]){rect(gx+1,22,2,20,'#8c6440');rect(gx+8,22,2,20,'#8c6440');for(let a=0;a<9;a++){const yy=22-Math.round(Math.sin(Math.PI*a/8)*5);rect(gx+1+a,yy,1,2,'#5f9e45');if(a%3===1)rect(gx+1+a,yy-1,1,1,'#d9485a');}}
       for(const[fx,fy,c,ph]of flowers){const sw=Math.round(Math.sin(t*1.6+ph)*.6);const col=['#d9485a','#f5d35a','#e7a2ab','#f6f3ea'][c];rect(fx+sw,fy,1,2,'#3f7a3a');rect(fx+sw-1,fy-1,3,1,col);rect(fx+sw,fy-2,1,1,col);}
@@ -2733,7 +2735,7 @@ async function netEnsureCode(){
 }
 const fmtCode=c=>c?`TU-${c.slice(0,3)}${c.slice(3)}`:'';
 const normCode=s=>String(s||'').toUpperCase().replace(/^TU-?/,'').replace(/[^A-Z0-9]/g,'');
-function rabbitStatus(r){const t=now();return{st:r.stage,mn:isMain(r)?1:0,h:r.happy,hu:r.hunger,sk:r.sick?1:0,pg:r.preg?1:0,aw:awayR(r)?1:0,sl:isAsleep(r,t)?1:0,ag:Math.floor((t-r.born)/MIN/1440*10)/10};}
+function rabbitStatus(r){const t=now();return{st:r.stage,mn:isMain(r)?1:0,h:r.happy,hu:r.hunger,sk:r.sick?1:0,pg:r.preg?1:0,aw:awayR(r)?1:0,sl:isAsleep(r,t)?1:0,sit:sitWindow(),ag:Math.floor((t-r.born)/MIN/1440*10)/10};}
 async function netPublish(force){
   if(!netOn())return;const n=netS();if(!force&&!NET.dirty&&Date.now()-NET.lastPub<180000)return;if(!force&&Date.now()-NET.lastPub<20000)return;
   NET.dirty=false;NET.lastPub=Date.now();
@@ -2900,7 +2902,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.10.29b';
+const GAME_VER='2026.10.30a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3650,6 +3652,47 @@ function giftGotScreen(x,from){const m=mainR();const verb={outfit:'穿上',acc:'
     save();toMain();cap(`${m&&(x.k==='outfit'||x.k==='acc')?m.name:''}${verb}了「${x.n}」`,4);};
   g.C=function(){sndClick();toMain();cap(`「${x.n}」收进「我的东西」了`,3);};
   return g;}
+
+
+/* ---------- 保姆带它们见面 ---------- */
+// 两家的兔子都托给保姆、时间有重叠，而且感情到 SIT_MEET 以上，两位阿姨会带它们见面一起玩；
+// 主人把兔子接回来（或时间到送回来）后，打开游戏就会看到它们见面的画面。
+const SIT_MEET=50,SIT_MIN=10;
+function sitWindow(){const t=now();if(S.sitter&&S.sitter.until>t)return[S.sitter.at||S.sitter.until-2*60*MIN,S.sitter.until,1];
+  const L=S.sitLast;if(L&&t-L.end<24*60*MIN)return[L.at,L.end,0];return 0;}
+function sitterEnd(t){t=t==null?now():t;const s=S.sitter;if(!s)return;const at=s.at||s.until-2*60*MIN,end=Math.min(t,s.until);
+  S.sitLast={at,end};S.sitMeetQ={at,end,t:now()};S.sitter=null;try{netMark();setTimeout(()=>{try{netPublish(true);}catch(e){}},50);}catch(e){}}
+function sitterMeets(q){const t=now(),out=[];
+  for(const r of household()){if(r.stage==='nest'||r.guest)continue;let best=null;
+    for(const x of netLiveRabbits()){const sw=x.e.s&&x.e.s.sit;if(!Array.isArray(sw)||sw.length<2)continue;const ta=+sw[0],te=sw[2]?Math.min(+sw[1],t):+sw[1];
+      const ov=Math.min(q.end,te)-Math.max(q.at,ta);if(ov<SIT_MIN*MIN)continue;const v=loveV(r,x.r);if(v<SIT_MEET)continue;
+      if(!best||v>best.v)best={r,x,v,ov};}
+    if(best)out.push(best);}
+  return out;}
+function sitterMeetCheck(){
+  const q=S.sitMeetQ;if(!q||inTut())return false;if(now()-q.t>40*MIN){S.sitMeetQ=null;save();return false;}
+  if(typeof NET==='undefined'||!netOn())return false;const fus=Object.keys(netS().friends||{});if(!fus.length){S.sitMeetQ=null;save();return false;}
+  if(!fus.some(fu=>NET.live[fu]&&NET.live[fu].rb))return false;
+  const L=sitterMeets(q);S.sitMeetQ=null;if(!L.length){save();return false;}
+  for(const m of L){const gain=Math.round(Math.min(8,3+m.ov/(60*MIN))*10)/10;loveAdd(m.r,m.x.r,gain);const R=loveRec(m.r,m.x.r);if(R)R.dt=now();
+    m.r.happy=Math.min(4,m.r.happy+1);const own=friendNick(m.x.fu);log(now(),`保姆阿姨带${m.r.name}和${own}家的${m.x.r.name}见面玩了`);
+    firstTime(m.r,'sitmeet',`${m.r.name}在阿姨家和${m.x.r.name}见面了`,3);}
+  save();playSitMeets(L,0);return true;}
+function playSitMeets(L,i){if(i>=L.length){toMain();return;}const m=L[i];const own=friendNick(m.x.fu);const v=loveV(m.r,m.x.r);
+  const title=`${m.r.name}在阿姨家和${own}家的${m.x.r.name}玩了${durText(m.ov)}\n感情 ${loveName(v)} ${Math.floor(v)}/100`;
+  setScreen(dateScreen(dateP(m.r),dateP(m.x.r),(hsh(Math.floor(m.ov/MIN),i,7)*2e9)>>>0,title,()=>{if(i+1<L.length)playSitMeets(L,i+1);else{toMain();cap(`保姆阿姨们带${m.r.name}和${m.x.r.name}见过面了`,5);}},v>=60?'cuddle':'play',{where:'sitter'}));sndCute();}
+// 阿姨家院子后面：两位保姆阿姨坐在长椅上聊天
+function drawAunties(t){
+  rect(14,25,30,2,'#8c6440');rect(15,27,1,3,'#6b4c32');rect(42,27,1,3,'#6b4c32');rect(14,22,30,1,'#a07450');
+  const A=[[22,'#c8506a','#3b3537',0],[36,'#4f6fa8','#9a9a9a',1]];
+  for(const[x,dress,hair,k]of A){const talk=Math.floor(t*3+k*1.5)%4<2&&Math.floor(t/2.5)%2===k;
+    rect(x-3,18,7,8,dress);rect(x-3,25,7,1,'#00000022');rect(x-2,26,2,3,'#3c3536');rect(x+1,26,2,3,'#3c3536');
+    rect(x-2,13,5,5,'#f2c9a8');rect(x-2,12,5,2,hair);rect(x-1,10,3,2,hair);rect(x+(k?-3:3),13,1,3,hair);
+    rect(x+(k?-1:1),15,1,1,INK);rect(x+(k?-1:1)+(k?-1:1)*0,17,talk?2:1,1,talk?'#b84a5a':'#c98a7a');
+    const arm=Math.floor(t*2+k)%3===0&&talk;rect(x+(k?-4:4),arm?17:19,1,arm?3:4,'#f2c9a8');}
+  rect(28,22,2,3,'#f6f3ea');rect(30,23,1,1,'#f6f3ea');
+  if(Math.floor(t/2.5)%2===0){bmP(['ooooo','o...o','ooooo','.o...'],25,4,{o:'#f6f3ea'});}else bmP(['ooooo','o...o','ooooo','...o.'],33,4,{o:'#f6f3ea'});
+}
 
 /* ---------- 家具 ---------- */
 // 家具的画法以底线 61 为准；摆在兔舍里时整件往上移到墙边（FURN_Y）
@@ -4507,14 +4550,14 @@ function boot(){
   if(!S.started)showStart();
   else{const gap=now()-S.t;tick(true);if(gap<10*MIN)checkQueue();}
   renderStrip();
-  setInterval(()=>{tick(false);try{surpriseCheck();}catch(e){console.error(e);}},1000);
+  setInterval(()=>{tick(false);try{if(mode==='main'&&!M&&sitterMeetCheck())return;}catch(e){console.error(e);}try{surpriseCheck();}catch(e){console.error(e);}},1000);
   requestAnimationFrame(frame);
 }
 boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
