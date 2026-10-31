@@ -1,0 +1,39 @@
+# 口袋兔子 · 每 10 分钟检查一次，有兔子需要主人就发手机通知
+name: 手机通知
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: push
+  cancel-in-progress: false
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: push
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 读取上次的进度
+        uses: actions/cache/restore@v4
+        with:
+          path: push_state.json
+          key: push-state-${{ github.run_id }}
+          restore-keys: push-state-
+      - run: npm install --no-save web-push@3.6.7
+        working-directory: push
+      - name: 发通知
+        env:
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          STATE_FILE: ${{ github.workspace }}/push_state.json
+        run: node push/worker.mjs
+      - name: 记下进度
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: push_state.json
+          key: push-state-${{ github.run_id }}
