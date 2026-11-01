@@ -26,9 +26,10 @@ async function main(){
   const players=await r.json()||{};
   // 上次跑到哪里；第一次（或太久没跑）只看最近 20 分钟，避免补发一大堆旧通知
   const from=Math.max(st.last||0,now-20*60000);
-  st.sent=st.sent||{};let n=0,dead=0;
+  st.sent=st.sent||{};let n=0,dead=0,subs=0,next=0;
   for(const[uid,p]of Object.entries(players)){
     const pu=p&&p.push;if(!pu||!pu.sub||!pu.sub.endpoint||!Array.isArray(pu.nt))continue;
+    subs++;for(const x of pu.nt)if(x&&x.at>now&&(!next||x.at<next))next=x.at;
     const due=pu.nt.filter(x=>x&&x.at>from&&x.at<=now&&x.at>(p.at||0));
     if(!due.length)continue;
     // 同一次只发一则（几件事一起的话合并成一句）
@@ -41,6 +42,6 @@ async function main(){
   }
   for(const[k,t]of Object.entries(st.sent))if(now-t>2*86400000)delete st.sent[k];
   st.last=now;fs.writeFileSync(STATE,JSON.stringify(st));
-  console.log(`检查了 ${Object.keys(players).length} 位玩家，发了 ${n} 则通知${dead?`，${dead} 个订阅已失效`:''}`);
+  console.log(`检查了 ${Object.keys(players).length} 位玩家（${subs} 位开了手机通知），发了 ${n} 则通知${next?`，下一则约 ${Math.round((next-now)/60000)} 分钟后`:''}${dead?`，${dead} 个订阅已失效`:''}`);
 }
 main().catch(e=>{console.error(e);fs.writeFileSync(STATE,JSON.stringify(st));process.exit(1);});
