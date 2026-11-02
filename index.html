@@ -354,7 +354,7 @@ function stepAge(r,t){
 function stepFamily(r,t){if(r.stage==='nest'||isAsleep(r,t))return;r.tm.poop+=1;if(r.tm.poop>=150){r.tm.poop=0;addPoop();}}
 function stepPreg(r,t){
   if(!r.preg)return;const el=(t-r.preg.at)/MIN;
-  if(el>=PREG_NEST&&!r.preg.nest){r.preg.nest=true;const m=`${r.name}开始叼草、扯毛做窝，快生了`;log(t,m);emit(m,'good');}
+  if(el>=PREG_NEST&&!r.preg.nest){r.preg.nest=true;pregNestX(r);const m=`${r.name}开始叼草、扯毛做窝，快生了`;log(t,m);emit(m,'good');}
   if(el>=PREG_LEN)giveBirth(r,t);
 }
 function nestX(){const used=S.nests.map(n=>n.x);for(const x of[50,72,34])if(!used.some(u=>Math.abs(u-x)<18))return x;return 50;}
@@ -362,7 +362,7 @@ function giveBirth(m,t){
   const pr=m.preg;m.preg=null;m.nurse=t+NURSE*MIN;
   const n=Math.max(0,Math.min(2+ri(0,3),CAP-household().length));
   if(!n){log(t,`${m.name}的宝宝没能出生（家里太挤了）`);return;}
-  const nest={id:S.nextNest++,mom:m.id,born:t,x:nestX(),count:n};S.nests.push(nest);
+  const nest={id:S.nextNest++,mom:m.id,born:t,x:pr.nestX!=null?pr.nestX:nestX(),count:n};S.nests.push(nest);
   const taken=livingTitles(),names=[],kids=[];
   for(let i=0;i<n;i++){
     const p=uniquePersona(m,pr.dadP,taken);taken.add(titleP(p));
@@ -371,7 +371,7 @@ function giveBirth(m,t){
     const dH=anc(pr.dad);kid.ancU=[...new Set([m.uid,...(m.ancU||[]),pr.dadUid||(dH&&dH.uid),...(pr.dadAnc||(dH&&dH.ancU)||[])].filter(Boolean))].slice(0,16);
     addHouse(kid);kids.push(kid);
   }
-  const msg=`${m.name}生了${n}只兔宝宝！`;log(t,msg);emit(msg,'good');try{famBirth(m,pr,kids,t);}catch(e){}
+  const msg=`${m.name}生了${n}只兔宝宝！`;log(t,msg);try{famBirth(m,pr,kids,t);}catch(e){}
 }
 const MKEYS=new Set(['hunger','happy','sick']);
 function callMsg(r,k){return{hunger:`${r.name}饿了`,happy:`${r.name}不开心`,sick:`${r.name}生病了`,bad:`${r.name}在捣蛋`,fake:`${r.name}在叫你`,scared:`${r.name}被吓到了`}[k];}
@@ -685,6 +685,7 @@ const WW=160,WALL_Y=38,FURN_Y=44,FY0=47,FY1=62;
 const CAM={x:0,last:0};
 function camUpdate(snap){const m=mainR();const tn=performance.now();if(!CAM.last||tn-CAM.last>800)snap=true;const dt=Math.min(.1,(tn-(CAM.last||tn))/1000);CAM.last=tn;
   let tx=CAM.x;if(m&&!awayR(m)&&m.stage!=='nest'){const v=vis(m);if(!v.hidden){if(v.act==='watchout'||(v.next&&v.next.a==='watchout'))tx=WIN.x+WIN.w/2-W/2;else{const sx=v.x-CAM.x;if(sx<34)tx=v.x-34;else if(sx>62)tx=v.x-62;}}}
+  if(BIRTH){const n=S.nests.find(x=>x.id===BIRTH.nid);if(n)tx=n.x-W/2;}
   tx=clamp(tx,0,WW-W);CAM.x=snap?tx:CAM.x+(tx-CAM.x)*Math.min(1,dt*3.5);if(Math.abs(CAM.x-tx)<.05)CAM.x=tx;return Math.round(CAM.x);}
 const camX=()=>Math.round(CAM.x);
 const randY=()=>rand(FY0,FY1);
@@ -712,7 +713,7 @@ const ACT={
  groom:{s(r,v,o){const p=o.p,pv=vis(p);const side=pv.x>(bounds(r)[0]+bounds(r)[1])/2?-1:1;goTo(r,v,pv.x+side*12*stageOpts(r).s,'groomdo',{p},null,clamp(pv.y,FY0,FY1));}},
  groomdo:{s(r,v,o){const p=o.p;if(!p||!S.rabbits.includes(p)||vis(p).hidden){v.dur=.1;return;}const pv=vis(p);v.dir=pv.x>v.x?1:-1;v.dur=2.8;v.pose='eat';start(p,pv,'bliss',{d:2.8});},u(r,v){v.pose=Math.floor(v.t/.4)%2?'eat':'sit';v.eye='open';}},
  bliss:{s(r,v,o){v.dur=o&&o.d||2.5;v.pose='sit';v.eye='closed';v.lift=0;}},
- carry:{s(r,v){const n=S.nests.find(n=>!n.pick);goTo(r,v,n?n.x+ri(-6,6):bounds(r)[0]+ri(0,8),'sit',null,'hay',n?FY1-1:null);}},
+ carry:{s(r,v){const px=r.preg&&r.preg.nest?pregNestX(r):null;const n=S.nests.find(n=>!n.pick);const x=px!=null?px:n?n.x:null;goTo(r,v,x!=null?x+ri(-6,6):bounds(r)[0]+ri(0,8),'sit',null,'hay',x!=null?FY1-1:null);}},
  nurse:{s(r,v){const n=S.nests.find(n=>n.mom===r.id);if(!n){v.dur=.1;return;}goTo(r,v,n.x+(v.x>n.x?14:-14),'nursedo',null,null,FY1-1);}},
  nursedo:{s(r,v){const n=S.nests.find(n=>n.mom===r.id);if(n)v.dir=n.x>v.x?1:-1;v.dur=5;v.pose='loaf';v.eye='half';}},
  eat:{s(r,v,o){v.dur=2.6;v.pose='eat';v.item=o.item;v.eye='open';},u(r,v){v.pose=Math.floor(v.t/.25)%2?'eat':'sit';},e(r,v){v.item=null;}},
@@ -792,12 +793,59 @@ function chooseAct(r,v){
 }
 function updatePen(dt){
   try{outsideTick(dt);}catch(e){}
+  try{birthTick(dt);}catch(e){console.error(e);}
   try{toyUpdate(dt);if(WANT&&now()>WANT.until){const wr=byId(WANT.rid);WANT=null;if(wr&&mode==='main')cap(`${wr.name}等不到你摸摸，有点失望地走开了`,3);}}catch(e){}
   const mr=mainR();if(FOLLOW&&mr&&!PETD&&performance.now()<FOLLOW.until&&!isAsleep(mr,now())){const v=vis(mr);if(!v.hidden&&!(v.script&&v.script.length)&&Math.abs(FOLLOW.x-v.x)>hwOf(mr)+5&&['sit','stand','look','wash','loaf'].includes(v.act)){v.dir=FOLLOW.x>v.x?1:-1;if(mr.tr.brave>=55&&Math.abs(FOLLOW.x-v.x)>16&&v.act!=='hop'){goTo(mr,v,FOLLOW.x-(FOLLOW.x>v.x?10:-10),'stand',null,null,FOLLOW.y!=null?clamp(FOLLOW.y,FY0,FY1):v.y);if(!FOLLOW.told){FOLLOW.told=1;if(firstTime(mr,'follow',`${mr.name}好奇地跟着你的手指`,1.2))cap(`${mr.name}好奇地跟着你的手指走`,3);}}}}
   for(const r of visible()){const v=vis(r);v.t+=dt;const A=ACT[v.act];if(A&&A.u)A.u(r,v,dt);if(v.t>=v.dur){if(A&&A.e)A.e(r,v);if(v.next){const n=v.next;start(r,v,n.a,n.o);if(v.act==='hop'&&n.item)v.item=n.item;}else chooseAct(r,v);}}
   for(let i=FX.length-1;i>=0;i--){const f=FX[i];f.life-=dt;f.t=(f.t||0)+dt;if(f.vx)f.x+=f.vx*dt;if(f.vy)f.y+=f.vy*dt;if(f.k==='z'){f.x+=dt*3;f.y-=dt*5;}if(f.k==='heart')f.y-=dt*7;if(f.life<=0)FX.splice(i,1);}
   if(shake>0)shake-=dt;
 }
+
+/* ================= 生宝宝动画 ================= */
+// 怀孕 20 小时起，妈妈在 preg.nestX 一点一点叼草堆出窝；生的时候趴进窝里，一只一只生出来。
+// 每位主人第一次回到画面都会看到（S.birthSeen 是个人的，不跟着家走）；爸爸在场的话会在旁边陪着。
+function pregNestX(r){if(r.preg.nestX==null)r.preg.nestX=nestX();return r.preg.nestX;}
+function nestProg(r,t){return clamp(((t-r.preg.at)/MIN-PREG_NEST)/(PREG_LEN-PREG_NEST-20),0,1);}
+const STRAW=[[-7,0],[3,-1],[-2,1],[6,0],[-5,-1],[1,0],[8,1],[-9,1],[4,1],[-3,-1],[7,-1],[0,1]];
+function drawBuildNest(x,p,front){
+  if(p>=.67){drawSprite(nestSprite(front),x,62,1);if(!front&&p>=.85){bx.fillStyle='#f6f1e8';for(const[dx,dy]of[[-4,-6],[3,-7],[0,-5],[6,-5]])bx.fillRect(x+dx,62+dy,2,1);}return;}
+  if(front)return;
+  if(p>=.34)drawSprite(nestSprite(false),x,62,1);
+  const n=Math.min(STRAW.length,3+Math.floor(p*14));
+  for(let i=0;i<n;i++){const[dx,dy]=STRAW[i];bx.fillStyle=i%2?'#d9c27a':'#c4a85e';bx.fillRect(x+dx-1,61+dy,3,1);}}
+const kitX=(n,i,cnt)=>n.x-((cnt-1)*5)/2+i*5;
+const birthKey=n=>n.id+':'+n.born;
+let BIRTH=null;
+function birthUnseen(n){if(n.pick||n.mom==null||now()-n.born>=NEST_END*MIN)return false;return!(S.birthSeen&&S.birthSeen[birthKey(n)]);}
+function birthNest(){for(const n of S.nests){if(!birthUnseen(n))continue;const kits=household().filter(k=>k.nestId===n.id&&k.stage==='nest');if(kits.length)return{n,kits};}return null;}
+function birthDad(kits){const k=kits[0];const H=S.hist&&S.hist[k.dad];const u=(S.fam&&S.fam.info&&S.fam.info.dadU)||(H&&H.uid);return household().find(r=>!awayR(r)&&r.stage!=='nest'&&r.sex==='m'&&(r.id===k.dad||(u&&r.uid===u)))||null;}
+function birthSeen(key){S.birthSeen=S.birthSeen||{};S.birthSeen[key]=1;for(const k of Object.keys(S.birthSeen))if(!S.nests.some(n=>birthKey(n)===k))delete S.birthSeen[k];S.birthSeen[key]=1;}
+function birthTick(dt){
+  if(mode!=='main'||M||SPEC||sitOn())return;
+  if(!BIRTH){const b=birthNest();if(!b)return;const m=byId(b.n.mom);if(!m||awayR(m)){birthSeen(birthKey(b.n));save();return;}
+    const d=birthDad(b.kits);BIRTH={key:birthKey(b.n),nid:b.n.id,mom:m.id,dad:d?d.id:null,total:b.kits.length,shown:0,t:0,ph:'go',pop:9};
+    const v=vis(m);v.hidden=false;v.script=null;goTo(m,v,b.n.x,'labor',null,null,FY1-1);
+    if(d){const dv=vis(d);dv.hidden=false;dv.script=null;goTo(d,dv,clampX(d,b.n.x+(b.n.x<WW/2?18:-18)),'helpdad',null,'hay',FY1-2);}
+    cap(`${m.name}要生了！它趴进窝里……`+(d?`\n${d.name}在旁边陪着它`:''),5);sndCute();return;}
+  const n=S.nests.find(x=>x.id===BIRTH.nid),m=byId(BIRTH.mom);if(!n||!m){birthEnd(false);return;}
+  const v=vis(m);BIRTH.pop+=dt;
+  if(BIRTH.ph==='go'){if(v.act==='labor'){BIRTH.ph='push';BIRTH.t=0;}else if(v.act!=='hop'){v.hidden=false;goTo(m,v,n.x,'labor',null,null,FY1-1);}return;}
+  if(v.act!=='labor'){BIRTH.ph='go';return;}
+  if(!BIRTH.dad&&BIRTH.shown<BIRTH.total){const kits=household().filter(k=>k.nestId===n.id&&k.stage==='nest');const nd=kits.length&&birthDad(kits);if(nd){BIRTH.dad=nd.id;cap(`${nd.name}赶来陪${m.name}了`,2.4);}}
+  const d=BIRTH.dad&&byId(BIRTH.dad);if(d){const dv=vis(d);if(dv.act!=='hop'&&dv.act!=='helpdad'){dv.hidden=false;goTo(d,dv,clampX(d,n.x+(n.x<WW/2?18:-18)),'helpdad',null,null,FY1-2);}}
+  BIRTH.t+=dt;
+  if(BIRTH.shown<BIRTH.total){if(BIRTH.t>(BIRTH.shown?2.6:3.2)){BIRTH.shown++;BIRTH.t=0;BIRTH.pop=0;
+      FX.push({k:'heart',x:kitX(n,BIRTH.shown-1,BIRTH.shown),y:52,life:1.3});try{beep(1568+BIRTH.shown*110,.07,'sine',.035);beep(2093+BIRTH.shown*110,.06,'sine',.03,.09);}catch(e){}
+      cap(`生下第${BIRTH.shown}只宝宝了！`+(d&&BIRTH.shown===1?`\n${d.name}凑过来看`:''),2.4);
+      if(d){const dv=vis(d);FX.push({k:'heart',x:dv.x,y:dv.y-15,life:1.1});dv.ht2=0;}}}
+  else if(BIRTH.t>2)birthEnd(true);}
+function birthEnd(ok){const B=BIRTH;BIRTH=null;if(!B)return;birthSeen(B.key);save();const m=byId(B.mom);
+  if(ok&&m){start(m,vis(m),'nursedo');const d=B.dad&&byId(B.dad);if(d)start(d,vis(d),'sit');cap(`${m.name}生了${B.total}只宝宝！`+(d?`\n${d.name}当爸爸了`:''),5);sndCute();}}
+Object.assign(ACT,{
+  labor:{s(r,v){v.dur=999;v.pose='loaf';v.eye='half';v.ht=0;const n=BIRTH&&S.nests.find(x=>x.id===BIRTH.nid);if(n)v.x=n.x;},
+    u(r,v,dt){if(!BIRTH){v.dur=0;return;}v.pose='loaf';v.ht+=dt;v.eye=(v.ht%2.6)>2.1?'closed':'half';}},
+  helpdad:{s(r,v){v.dur=999;v.pose='sit';v.item=null;v.ht=0;v.ht2=9;const n=BIRTH&&S.nests.find(x=>x.id===BIRTH.nid);if(n)v.dir=n.x>v.x?1:-1;},
+    u(r,v,dt){if(!BIRTH){v.dur=0;return;}v.ht+=dt;v.ht2=(v.ht2||0)+dt;const n=S.nests.find(x=>x.id===BIRTH.nid);if(n)v.dir=n.x>v.x?1:-1;v.pose=v.ht2<1.2?'stand':(v.ht%3.4)>2.8?'loaf':'sit';}}});
 
 /* ================= pen drawing ================= */
 // 落地窗：在兔舍正中间，从天花板一直到地板。drawWindow 画窗外的景色（天空、草地、天气、偶尔经过的小动物），drawWinTrim 画窗框、窗帘
@@ -928,13 +976,14 @@ function drawPen(){
   ents.push({y:61,f:()=>{drawBox(1,40);const hid=visible().filter(r=>vis(r).hidden);if(hid.length&&Math.floor(performance.now()/1700)%5)bm('eyes',6,55,'#f3e7b3');}});
   if(S.decor.hay>t)ents.push({y:58,f:()=>bm('hayheart',60,54)});
   for(const n of nests)ents.push({y:61.5,f:()=>drawSprite(nestSprite(false),n.x,62,1)});
+  for(const r of household())if(r.preg&&r.preg.nest&&!awayR(r)){const x=pregNestX(r),p=nestProg(r,t);ents.push({y:61.5,f:()=>drawBuildNest(x,p,false)});if(p>=.67&&!sitOn())ents.push({y:62.5,f:()=>drawBuildNest(x,p,true)});}
   for(const p of S.poops)ents.push({y:p.y+3,f:()=>bm('poop',p.x,p.y)});
   if(S.gift){const g=S.gift,gy=giftY(g),b=BM['tr_'+g.id];if(b)ents.push({y:gy,f:()=>{bm('tr_'+g.id,g.x-Math.floor(b[0].length/2),gy-b.length);if(Math.floor(performance.now()/350)%3===0)bm('star',g.x+2,gy-b.length-3);if(g.sel&&Math.floor(performance.now()/400)%2)bm('arrow',g.x-2,gy-b.length-8);}});}
   const m=mainR();if(m&&m.mis&&m.mis.type==='wire')ents.push({y:60.5,f:()=>drawWire(m)});
   if(fk)for(const e of festFloor(fk))ents.push(e);
   {const te=drawToy();if(te)ents.push(te);}
   for(const r of S.rabbits.filter(x=>!x.temp&&!awayR(x))){
-    if(r.stage==='nest'){const n=nests.find(n=>n.id===r.nestId);if(!n)continue;const kits=household().filter(k=>k.nestId===n.id&&k.stage==='nest');const i=kits.indexOf(r),cnt=kits.length;const x=n.x-((cnt-1)*5)/2+i*5;const wob=Math.sin(t/300+i*1.7)>.6?1:0;ents.push({y:61.7,f:()=>drawSprite(spriteOf(r),x,60-wob,i%2?1:-1)});continue;}
+    if(r.stage==='nest'){const n=nests.find(n=>n.id===r.nestId);if(!n)continue;let kits=household().filter(k=>k.nestId===n.id&&k.stage==='nest');const bn=BIRTH&&BIRTH.nid===n.id;if(bn)kits=kits.slice(0,BIRTH.shown);else if(birthUnseen(n))kits=[];const i=kits.indexOf(r),cnt=kits.length;if(i<0)continue;const x=kitX(n,i,cnt);const wob=(bn&&i===cnt-1&&BIRTH.pop<.6)?Math.round(3*(1-BIRTH.pop/.6)):(Math.sin(t/300+i*1.7)>.6?1:0);ents.push({y:61.7,f:()=>drawSprite(spriteOf(r),x,60-wob,i%2?1:-1)});continue;}
     const v=vis(r);if(v.hidden)continue;if(SPEC&&SPEC.k==='peek'&&isMain(r))continue;ents.push({y:v.y,f:()=>drawRabbitAt(r,v)});
   }
   if(!sitOn())for(const n of nests)ents.push({y:62.5,f:()=>drawSprite(nestSprite(true),n.x,62,1)});
@@ -2205,7 +2254,7 @@ function greetScript(r,morning){
   if(r.tr.cuddly>=68)return{s:[{go:meX(),a:'thump'},{a:'binky'},{a:'binky'},{a:'purr'}],m:`${r.name}跺跺脚：你去哪了！然后开心地扑过来`};
   return{s:[{go:meX(),a:'binky'},{a:'binky'},{a:'purr'}],m:morning?`早安！${r.name}一直在等你`:`${r.name}冲过来迎接你，开心得跳起来！`};
 }
-function surpriseCheck(){
+function surpriseCheck(){if(BIRTH||(typeof birthNest==="function"&&mode==="main"&&birthNest()))return;
   if(mode!=='main'||document.hidden||!S.started||SPEC||DREAM||homeAway())return;
   const r=mainR();if(!r||r.stage==='nest'||S.tut>=1&&S.tut<=5)return;
   if(performance.now()<capUntil||selIcon>=0)return;
@@ -2239,7 +2288,7 @@ function surpriseCheck(){
   for(const d of[7,30,100,365])if(od>=d&&!S.annO[d]){S.annO[d]=1;for(let i=0;i<30;i++)FX.push({k:'conf',x:ri(2,94),y:-ri(0,20),vy:rand(12,20),c:['#d9485a','#e3b341','#7d9fc0','#5f9e45','#8a6fb0'][ri(0,4)],life:4});cap(`你已经养兔子${d}天了！${r.name}替所有兔子谢谢你`,6);sndCute();snap(r,`养兔子满${d}天`,1.5);save();return;}
   {const ms=missOf(r);if(ms&&supReady('miss',45)&&!r.sick&&!(r.cold>t)&&chance(.5)){supMark('miss');runScript(r,[{go:WIN.x+WIN.w/2-12,gy:FY0,a:'stare'},{a:'sit'}]);DREAM={t:0,dur:6,kind:'love',ck:ms.ck};cap(`${r.name}站在窗边发呆……它在想念${ms.nm}`,5);sndCute();firstTime(r,'miss',`${r.name}第一次想念${ms.nm}`,1.5);save();return;}}
   if(S.loginDay!==today){S.loginDay=today;const c=addCoins(5,'见面礼');if(c){cap(`今天的见面礼：🥕 +5（现在有${S.coins}个）`,4);sndOk();save();return;}}
-  {const T=taskList();if(T&&!T.shown){T.shown=true;save();const x=TASKS.find(y=>y.id===T.L[0].id);cap(`今天有 ${T.L.length} 个小任务，第一个是「${x.t(r)}」\n在「兔谱 → 今天的小任务」看全部`,6);sndClick();return;}}
+  {const T=taskList();if(T&&!T.shown&&!BIRTH){T.shown=true;save();const x=TASKS.find(y=>y.id===T.L[0].id);cap(`今天有 ${T.L.length} 个小任务，第一个是「${x.t(r)}」\n在「兔谱 → 今天的小任务」看全部`,6);sndClick();return;}}
   if(weatherAt(t)==='thunder'&&r.tr.brave<45&&!r.scared&&supReady('thunder',25)&&chance(1.5)){supMark('thunder');r.scared=1;start(r,v,'thump');cap(`轰隆！打雷了，${r.name}吓得一直跺脚\n点它摸摸，让它安心`,6);save();return;}
   if(weatherAt(t)==='rainbow'&&S.rbDay!==today&&S.light){S.rbDay=today;cap(`窗外出现了彩虹！${r.name}也抬头看着`,5);sndCute();runScript(r,[{go:WIN.x+WIN.w/2-12,gy:FY0,a:'stand'}]);snap(r,`和${r.name}一起看到彩虹`,1.2);save();return;}
   const lastDay=(t-r.born)/MIN>=(r.life-1)*1440&&(r.stage==='adult'||r.stage==='elder');
@@ -3091,7 +3140,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.02d';
+const GAME_VER='2026.11.02e';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
