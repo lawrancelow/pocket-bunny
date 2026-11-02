@@ -987,7 +987,7 @@ function drawPen(){
     const v=vis(r);if(v.hidden)continue;if(SPEC&&SPEC.k==='peek'&&isMain(r))continue;ents.push({y:v.y,f:()=>drawRabbitAt(r,v)});
   }
   if(!sitAway())for(const n of nests)ents.push({y:62.5,f:()=>drawSprite(nestSprite(true),n.x,62,1)});
-  if(homeSit())ents.push({y:51,f:()=>drawHomeSitter(t)});
+  if(homeSit())ents.push({y:55,f:()=>drawHomeSitter(t)});
   ents.sort((a,b)=>a.y-b.y);for(const e of ents)e.f();
   drawFX();drawOwnerHand();
   if(!S.light){bx.restore();bx.fillStyle='rgba(20,24,32,.74)';bx.fillRect(0,0,W,H);bx.save();bx.translate(-cx,0);drawWindow(WIN.x,WIN.y);}
@@ -2646,7 +2646,7 @@ Object.assign(BM,{
 });
 function drawAwaySign(){
   const t=now(),m=mainR(),c=S.light?INK:NIGHT_INK;let until,icon;
-  if(homeSit()){digits(hms(S.sitter.until-t),12,1,c);return;}if(sitOn()){until=S.sitter.until;icon='hhouse';}else if(m&&m.away){until=m.away.until;icon='bag';}else return;
+  if(homeSit()){const hs=hms(S.sitter.until-t);bx.fillStyle=S.light?'rgba(205,213,181,.92)':'rgba(30,34,48,.85)';bx.fillRect(10,0,strW(hs)+4,8);digits(hs,12,1,c);return;}if(sitOn()){until=S.sitter.until;icon='hhouse';}else if(m&&m.away){until=m.away.until;icon='bag';}else return;
   const str=hms(until-t),others=visible().filter(r=>!awayR(r)).length;
   if(others){digits(str,2,1,c);return;}
   const w=strW2(str),x0=Math.round((W-w)/2);
@@ -3159,7 +3159,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.02g';
+const GAME_VER='2026.11.02h';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3269,16 +3269,30 @@ function famTakeFather(d){const f=d&&d.father;let fr=null;if(f&&f.j)try{fr=JSON.
     S.rabbits.push(r);VIS.delete(r.id);const m=`${i.guestNick}家的${r.name}搬来陪宝宝了`;log(now(),m);if(mode==='main')cap(m,4);famMark();}
   api('DELETE',`families/${FAM.fid}/father`).catch(()=>{});}
 // ---- 另一位主人的照顾动作
-// 上门保姆阿姨：在房间里慢慢走来走去，偶尔蹲下来添草、摸摸兔子
-function drawHomeSitter(){const T=performance.now()/1000;const span=WW-60,ph=T/11;
-  const x=Math.round(30+span*(.5+.5*Math.sin(ph))),dir=Math.cos(ph)>=0?1:-1,edge=Math.abs(Math.sin(ph))>.93,kneel=edge&&Math.floor(T*1.3)%5<3;
-  const skin='#f2c9a8',hair='#4a3a30',dress='#6f9a84',dy=kneel?4:0,step=!edge&&Math.floor(T*4)%2;
-  if(!kneel){rect(x-2,47,2,4-(step?1:0),'#3c3536');rect(x+1,47,2,4-(step?0:1),'#3c3536');}else{rect(x-3,49,7,2,'#3c3536');}
-  rect(x-3,38+dy,7,9-(kneel?2:0),dress);rect(x-2,40+dy,5,kneel?4:6,'#f3efe4');rect(x-3,46+dy-(kneel?2:0),7,1,'#00000022');
-  rect(x-2,32+dy,5,5,skin);rect(x-2,31+dy,5,2,hair);rect(x-1,29+dy,3,2,hair);rect(dir>0?x-3:x+3,32+dy,1,3,hair);
-  rect(x+dir,34+dy,1,1,INK);rect(x+dir*(dir>0?1:2),36+dy,1,1,'#c98a7a');
-  if(kneel){rect(x+dir*4,44,1,3,skin);rect(x+dir*5-(dir<0?1:0),46,3,1,'#d9c27a');rect(x+dir*5-(dir<0?1:0),45,2,1,'#c4a85e');if(Math.floor(T*2)%3===0)bm('heart',x+dir*6-2,38);}
-  else{rect(x-4,39+dy,1,5,skin);rect(x+4,39+dy,1,5,skin);}}
+// 上门保姆阿姨：在房间里慢慢走来走去，偶尔蹲下来添草、摸摸兔子（大人的身高，差不多到天花板的三分之二）
+function drawHomeSitter(){const T=performance.now()/1000,span=WW-50,ph=T/12;
+  const x=Math.round(25+span*(.5+.5*Math.sin(ph))),dir=Math.cos(ph)>=0?1:-1,edge=Math.abs(Math.sin(ph))>.94,kneel=edge&&Math.floor(T*1.2)%5<3;
+  const R=(dx,y,w,h,c)=>rect(dir>0?x+dx:x-dx-w,y,w,h,c);
+  const skin='#f2c9a8',skin2='#e2b08e',hair='#4a3a30',hair2='#6a5446',dress='#6f9a84',dress2='#5a8270',apr='#f6f2e8',apr2='#e2dccd',shoe='#3c3536';
+  const k=kneel?8:0,step=!edge?Math.floor(T*3.2)%2:0;
+  // 腿和鞋
+  if(!kneel){R(-4,47+step,3,6-step,skin2);R(1,47+(1-step),3,6-(1-step),skin2);R(-5,53,4,2,shoe);R(1,53,4,2,shoe);}
+  else{R(-7,52,13,3,dress2);R(5,53,3,2,shoe);}
+  // 裙子
+  R(-6,36+k,12,k?8:11,dress);R(-7,43+k,14,k?3:5,dress);R(-7,47+k,14,1,dress2);
+  // 上身
+  R(-5,26+k,10,11,dress);R(-5,26+k,1,11,dress2);R(-2,26+k,4,1,apr);
+  // 围裙
+  R(-3,30+k,7,k?14:16,apr);R(-3,30+k,7,1,apr2);R(-1,37+k,4,3,apr2);R(-1,27+k,1,3,apr);R(3,27+k,1,3,apr);R(-6,31+k,2,2,apr2);
+  // 手臂
+  if(kneel){R(4,28+k,2,7,dress);R(6,34+k,4,2,skin);R(8,46,5,2,'#d9c27a');R(9,45,4,1,'#c4a85e');R(7,47,6,1,'#c4a85e');}
+  else{const sw=step?1:0;R(-7,27,2,8,dress2);R(-7,35+sw,2,2,skin);R(5,27,2,8,dress);R(5,35+(1-sw),2,2,skin);}
+  // 脖子、头
+  R(-1,24+k,3,2,skin2);R(-4,15+k,8,10,skin);R(-4,15+k,1,1,hair);R(-4,24+k,1,1,'#00000000');
+  R(-5,12+k,10,4,hair);R(-5,16+k,3,7,hair);R(-5,22+k,2,2,hair2);R(-2,9+k,5,4,hair);R(-1,8+k,3,1,hair2);R(2,13+k,3,1,hair2);
+  // 脸（朝前方三分之一）
+  const blink=Math.floor(T*1.7)%7===0;R(0,18+k,1,blink?1:2,INK);R(3,18+k,1,blink?1:2,INK);R(3,21+k,1,1,'#e9a0a0');R(-1,21+k,1,1,'#e9a0a0');R(1,22+k,2,1,'#c06a6a');
+  if(kneel&&Math.floor(T*2)%3===0)bm('heart',dir>0?x+10:x-14,38);}
 function homeSitMenu(){return menu('请保姆来家里',[2,4,6,8,10,12].map(h=>({t:`${h}小时`,s:'喂饭、打扫、看病',on:()=>{setScreen(confirmScr('请保姆来家里',`请保姆阿姨来家里照顾${h}小时？\n两家都算，不用另外请`,()=>famSitter(h),()=>setScreen(homeSitMenu())));}})),()=>setScreen(familyMenu()),'两家一起用');}
 function famSitSet(h,by){const t=now();if(h>0){S.sitter={at:t,until:t+h*60*MIN,home:1,by:String(by||'').slice(0,8)};const m=`${by||'你'}请了保姆阿姨来家里照顾${h}小时`;log(t,m);if(mode==='main')cap(m,4);}
   else if(S.sitter&&S.sitter.home){S.sitter=null;const m=`保姆阿姨回家了`;log(t,m);if(mode==='main')cap(m,3);}famMark();}
