@@ -444,7 +444,7 @@ const compatHearts=(a,b)=>{const n=clamp(Math.round((compat(a,b)-40)/12),1,5);re
 function stepMinute(t){
   S.t=t;
   const sit=!!(S.sitter&&S.sitter.until>t);
-  if(S.sitter&&S.sitter.until<=t){log(t,'邻居阿姨把兔子交还给你了');emit('邻居阿姨把兔子交还给你了','good');sitterEnd(t);}
+  if(S.sitter&&S.sitter.until<=t){const hm=S.sitter.home,ms=hm?'保姆阿姨照顾完，回家了':'邻居阿姨把兔子交还给你了';log(t,ms);emit(ms,'good');sitterEnd(t);}
   for(const r of household()){
     if(!S.rabbits.includes(r))continue;
     stepAge(r,t);if(!S.rabbits.includes(r))continue;
@@ -821,7 +821,7 @@ function birthNest(){for(const n of S.nests){if(!birthUnseen(n))continue;const k
 function birthDad(kits){const k=kits[0];const H=S.hist&&S.hist[k.dad];const u=(S.fam&&S.fam.info&&S.fam.info.dadU)||(H&&H.uid);return household().find(r=>!awayR(r)&&r.stage!=='nest'&&r.sex==='m'&&(r.id===k.dad||(u&&r.uid===u)))||null;}
 function birthSeen(key){S.birthSeen=S.birthSeen||{};S.birthSeen[key]=1;for(const k of Object.keys(S.birthSeen))if(!S.nests.some(n=>birthKey(n)===k))delete S.birthSeen[k];S.birthSeen[key]=1;}
 function birthTick(dt){
-  if(mode!=='main'||M||SPEC||sitOn())return;
+  if(mode!=='main'||M||SPEC||sitAway())return;
   if(!BIRTH){const b=birthNest();if(!b)return;const m=byId(b.n.mom);if(!m||awayR(m)){birthSeen(birthKey(b.n));save();return;}
     const d=birthDad(b.kits);BIRTH={key:birthKey(b.n),nid:b.n.id,mom:m.id,dad:d?d.id:null,total:b.kits.length,shown:0,t:0,ph:'go',pop:9};
     const v=vis(m);v.hidden=false;v.script=null;goTo(m,v,b.n.x,'labor',null,null,FY1-1);
@@ -976,7 +976,7 @@ function drawPen(){
   ents.push({y:61,f:()=>{drawBox(1,40);const hid=visible().filter(r=>vis(r).hidden);if(hid.length&&Math.floor(performance.now()/1700)%5)bm('eyes',6,55,'#f3e7b3');}});
   if(S.decor.hay>t)ents.push({y:58,f:()=>bm('hayheart',60,54)});
   for(const n of nests)ents.push({y:61.5,f:()=>drawSprite(nestSprite(false),n.x,62,1)});
-  for(const r of household())if(r.preg&&r.preg.nest&&!awayR(r)){const x=pregNestX(r),p=nestProg(r,t);ents.push({y:61.5,f:()=>drawBuildNest(x,p,false)});if(p>=.67&&!sitOn())ents.push({y:62.5,f:()=>drawBuildNest(x,p,true)});}
+  for(const r of household())if(r.preg&&r.preg.nest&&!awayR(r)){const x=pregNestX(r),p=nestProg(r,t);ents.push({y:61.5,f:()=>drawBuildNest(x,p,false)});if(p>=.67&&!sitAway())ents.push({y:62.5,f:()=>drawBuildNest(x,p,true)});}
   for(const p of S.poops)ents.push({y:p.y+3,f:()=>bm('poop',p.x,p.y)});
   if(S.gift){const g=S.gift,gy=giftY(g),b=BM['tr_'+g.id];if(b)ents.push({y:gy,f:()=>{bm('tr_'+g.id,g.x-Math.floor(b[0].length/2),gy-b.length);if(Math.floor(performance.now()/350)%3===0)bm('star',g.x+2,gy-b.length-3);if(g.sel&&Math.floor(performance.now()/400)%2)bm('arrow',g.x-2,gy-b.length-8);}});}
   const m=mainR();if(m&&m.mis&&m.mis.type==='wire')ents.push({y:60.5,f:()=>drawWire(m)});
@@ -986,7 +986,8 @@ function drawPen(){
     if(r.stage==='nest'){const n=nests.find(n=>n.id===r.nestId);if(!n)continue;let kits=household().filter(k=>k.nestId===n.id&&k.stage==='nest');const bn=BIRTH&&BIRTH.nid===n.id;if(bn)kits=kits.slice(0,BIRTH.shown);else if(birthUnseen(n))kits=[];const i=kits.indexOf(r),cnt=kits.length;if(i<0)continue;const x=kitX(n,i,cnt);const wob=(bn&&i===cnt-1&&BIRTH.pop<.6)?Math.round(3*(1-BIRTH.pop/.6)):(Math.sin(t/300+i*1.7)>.6?1:0);ents.push({y:61.7,f:()=>drawSprite(spriteOf(r),x,60-wob,i%2?1:-1)});continue;}
     const v=vis(r);if(v.hidden)continue;if(SPEC&&SPEC.k==='peek'&&isMain(r))continue;ents.push({y:v.y,f:()=>drawRabbitAt(r,v)});
   }
-  if(!sitOn())for(const n of nests)ents.push({y:62.5,f:()=>drawSprite(nestSprite(true),n.x,62,1)});
+  if(!sitAway())for(const n of nests)ents.push({y:62.5,f:()=>drawSprite(nestSprite(true),n.x,62,1)});
+  if(homeSit())ents.push({y:51,f:()=>drawHomeSitter(t)});
   ents.sort((a,b)=>a.y-b.y);for(const e of ents)e.f();
   drawFX();drawOwnerHand();
   if(!S.light){bx.restore();bx.fillStyle='rgba(20,24,32,.74)';bx.fillRect(0,0,W,H);bx.save();bx.translate(-cx,0);drawWindow(WIN.x,WIN.y);}
@@ -1095,6 +1096,7 @@ function stripState(){
   if(S.tut>=1&&S.tut<=5)return[tutText(r),'tut'];
   const t=now();
   if(homeAway())return[`${awayLine(r)}\n在「家族」里可以提早接回来`,''];
+  if(homeSit()&&!needList().length)return[`保姆阿姨${S.sitter.by?`（${S.sitter.by}请的）`:''}在家里照顾\n还有${durText(S.sitter.until-t)}`,''];
   if(r.stage==='nest')return[`${r.name}还在毛窝里\n大约${ageText(NEST_END-(t-r.born)/MIN)}后出窝`,''];
   if(S.gift&&!r.sick)return[`${r.name}送了你一样东西！\n按 B 收下`,'need'];
   const nl=needList();if(nl.length)return[nl[0].tx,'need'];
@@ -1475,7 +1477,8 @@ function familyMenu(){
     }
     L.push({t:'朋友联机',s:'兔子码',h:'串门、相亲、送礼物、送宝宝',on:()=>setScreen(netMenu())});
     const sit=S.sitter&&S.sitter.until>t;
-    L.push(sit?{t:'接兔子回来',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('接兔子回来','现在就从邻居阿姨家把兔子们接回来？',()=>{sitterEnd();save();cap('你把兔子们接回来了！');sndOk();toMain();},()=>setScreen(familyMenu())))}:{t:'请邻居照顾',s:'出门时用',h:'出门或睡觉前托管：兔子们会去邻居家，时间到了送回来',on:()=>setScreen(sitterMenu())});
+    if(famView()){L.push(homeSit()?{t:'让保姆阿姨回去',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('让保姆回去','让保姆阿姨现在就回去？',()=>{famSitter(0);},()=>setScreen(familyMenu())))}:{t:'请保姆来家里',s:'两家一起用',h:'保姆阿姨会来家里照顾这一家子，你们两个都不用另外请',dis:sitAway()?'兔子们在邻居家':null,on:()=>setScreen(homeSitMenu())});}
+    else L.push(sit?{t:'接兔子回来',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('接兔子回来','现在就从邻居阿姨家把兔子们接回来？',()=>{sitterEnd();save();cap('你把兔子们接回来了！');sndOk();toMain();},()=>setScreen(familyMenu())))}:{t:'请邻居照顾',s:'出门时用',h:'出门或睡觉前托管：兔子们会去邻居家，时间到了送回来',on:()=>setScreen(sitterMenu())});
     return L;};
   return menu('家族',items,null,`${household().length}/${CAP}只`,true);
 }
@@ -2627,9 +2630,12 @@ function postcardScreen(a){
 
 /* ================= 出门（串门 / 托管）倒数 ================= */
 const sitOn=t=>!!(S.sitter&&S.sitter.until>(t==null?now():t));
-const awayR=(r,t)=>!!(r&&!r.guest&&(sitOn(t)||(r.away&&r.away.until>(t==null?now():t))));
-function homeAway(){const m=mainR();return sitOn()||awayR(m);}
-function awayLine(r){const t=now();if(sitOn())return`兔子们都在邻居阿姨家，还有${durText(S.sitter.until-t)}回来`;if(r&&r.away)return`${r.name}去${r.away.to}家串门了，还有${durText(r.away.until-t)}回来`;return'';}
+// 上门保姆（两家一起带宝宝的时候）：保姆来家里照顾，兔子不用被接走
+const homeSit=t=>sitOn(t)&&!!S.sitter.home;
+const sitAway=t=>sitOn(t)&&!S.sitter.home;
+const awayR=(r,t)=>!!(r&&!r.guest&&(sitAway(t)||(r.away&&r.away.until>(t==null?now():t))));
+function homeAway(){const m=mainR();return sitAway()||awayR(m);}
+function awayLine(r){const t=now();if(sitAway())return`兔子们都在邻居阿姨家，还有${durText(S.sitter.until-t)}回来`;if(r&&r.away)return`${r.name}去${r.away.to}家串门了，还有${durText(r.away.until-t)}回来`;return'';}
 function hms(ms){ms=Math.max(0,ms);const s=Math.ceil(ms/1000),h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return`${h}:${pad2(m)}:${pad2(x)}`;}
 function digits2(str,x,y,c){bx.fillStyle=c||INK;for(const ch of str){const g=DIG[ch];if(!g){x+=4;continue;}for(let j=0;j<5;j++)for(let i=0;i<g[j].length;i++)if(g[j][i]==='#')bx.fillRect(x+i*2,y+j*2,2,2);x+=g[0].length*2+2;}return x;}
 const strW2=s=>strW(s)*2;
@@ -2640,7 +2646,7 @@ Object.assign(BM,{
 });
 function drawAwaySign(){
   const t=now(),m=mainR(),c=S.light?INK:NIGHT_INK;let until,icon;
-  if(sitOn()){until=S.sitter.until;icon='hhouse';}else if(m&&m.away){until=m.away.until;icon='bag';}else return;
+  if(homeSit()){digits(hms(S.sitter.until-t),12,1,c);return;}if(sitOn()){until=S.sitter.until;icon='hhouse';}else if(m&&m.away){until=m.away.until;icon='bag';}else return;
   const str=hms(until-t),others=visible().filter(r=>!awayR(r)).length;
   if(others){digits(str,2,1,c);return;}
   const w=strW2(str),x0=Math.round((W-w)/2);
@@ -2661,7 +2667,7 @@ function sendVisit(m){
     setScreen(codeScreen('串门码',`把这段发给朋友，${esc(m.name)}就会出现在他家，玩${VISIT_H}小时后回来。`,c,`🐰 ${S.nick||'我'}家的${m.name}要来你家串门！复制整段贴进口袋兔子：`,()=>toMain()));
   },()=>setScreen(netMenu())));
 }
-function visitBlock(m){if(!m||m.stage==='nest')return'现在没有可以出门的兔子';if(m.away)return`${m.name}已经出门了`;if(sitOn())return'兔子们在邻居家';if(m.sick)return`${m.name}生病了，在家休息吧`;if(m.preg)return`${m.name}怀孕了，别让它出远门`;if(isAsleep(m,now()))return`${m.name}在睡觉`;return null;}
+function visitBlock(m){if(!m||m.stage==='nest')return'现在没有可以出门的兔子';if(m.away)return`${m.name}已经出门了`;if(sitAway())return'兔子们在邻居家';if(m.sick)return`${m.name}生病了，在家休息吧`;if(m.preg)return`${m.name}怀孕了，别让它出远门`;if(isAsleep(m,now()))return`${m.name}在睡觉`;return null;}
 function returnHome(r,t,early){
   const pl=r.away.to;r.away=null;VIS.delete(r.id);r.hunger=Math.max(r.hunger,3);r.happy=Math.min(4,Math.max(r.happy,3));
   const tid=pickTreasure(r);S.treasures=S.treasures||{};S.treasures[tid]=(S.treasures[tid]||0)+1;
@@ -3153,7 +3159,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.02f';
+const GAME_VER='2026.11.02g';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3263,6 +3269,21 @@ function famTakeFather(d){const f=d&&d.father;let fr=null;if(f&&f.j)try{fr=JSON.
     S.rabbits.push(r);VIS.delete(r.id);const m=`${i.guestNick}家的${r.name}搬来陪宝宝了`;log(now(),m);if(mode==='main')cap(m,4);famMark();}
   api('DELETE',`families/${FAM.fid}/father`).catch(()=>{});}
 // ---- 另一位主人的照顾动作
+// 上门保姆阿姨：在房间里慢慢走来走去，偶尔蹲下来添草、摸摸兔子
+function drawHomeSitter(){const T=performance.now()/1000;const span=WW-60,ph=T/11;
+  const x=Math.round(30+span*(.5+.5*Math.sin(ph))),dir=Math.cos(ph)>=0?1:-1,edge=Math.abs(Math.sin(ph))>.93,kneel=edge&&Math.floor(T*1.3)%5<3;
+  const skin='#f2c9a8',hair='#4a3a30',dress='#6f9a84',dy=kneel?4:0,step=!edge&&Math.floor(T*4)%2;
+  if(!kneel){rect(x-2,47,2,4-(step?1:0),'#3c3536');rect(x+1,47,2,4-(step?0:1),'#3c3536');}else{rect(x-3,49,7,2,'#3c3536');}
+  rect(x-3,38+dy,7,9-(kneel?2:0),dress);rect(x-2,40+dy,5,kneel?4:6,'#f3efe4');rect(x-3,46+dy-(kneel?2:0),7,1,'#00000022');
+  rect(x-2,32+dy,5,5,skin);rect(x-2,31+dy,5,2,hair);rect(x-1,29+dy,3,2,hair);rect(dir>0?x-3:x+3,32+dy,1,3,hair);
+  rect(x+dir,34+dy,1,1,INK);rect(x+dir*(dir>0?1:2),36+dy,1,1,'#c98a7a');
+  if(kneel){rect(x+dir*4,44,1,3,skin);rect(x+dir*5-(dir<0?1:0),46,3,1,'#d9c27a');rect(x+dir*5-(dir<0?1:0),45,2,1,'#c4a85e');if(Math.floor(T*2)%3===0)bm('heart',x+dir*6-2,38);}
+  else{rect(x-4,39+dy,1,5,skin);rect(x+4,39+dy,1,5,skin);}}
+function homeSitMenu(){return menu('请保姆来家里',[2,4,6,8,10,12].map(h=>({t:`${h}小时`,s:'喂饭、打扫、看病',on:()=>{setScreen(confirmScr('请保姆来家里',`请保姆阿姨来家里照顾${h}小时？\n两家都算，不用另外请`,()=>famSitter(h),()=>setScreen(homeSitMenu())));}})),()=>setScreen(familyMenu()),'两家一起用');}
+function famSitSet(h,by){const t=now();if(h>0){S.sitter={at:t,until:t+h*60*MIN,home:1,by:String(by||'').slice(0,8)};const m=`${by||'你'}请了保姆阿姨来家里照顾${h}小时`;log(t,m);if(mode==='main')cap(m,4);}
+  else if(S.sitter&&S.sitter.home){S.sitter=null;const m=`保姆阿姨回家了`;log(t,m);if(mode==='main')cap(m,3);}famMark();}
+function famSitter(h){toMain();const me=S.nick||'你';if(famMirror()){famCmd({k:'sit',h});const t=now();S.sitter=h>0?{at:t,until:t+h*60*MIN,home:1,by:me}:null;cap(h>0?`请了保姆阿姨来家里照顾${h}小时\n${famOtherNick()}那边也一样`:'保姆阿姨回家了',4);sndOk();return;}
+  famSitSet(h,me);sndOk();save();try{famPublish(true);}catch(e){}}
 function famCmd(o){if(!FAM)return;o.by=famUid();o.nick=S.nick||'朋友';o.at=Date.now();api('POST',`families/${FAM.fid}/cmd`,o).catch(()=>{cap('没送出去，等一下再试',3);});}
 function famTakeCmds(d){const L=d&&d.cmd;if(!L)return;FAM.doneCmd=FAM.doneCmd||{};
   let n=0;for(const[k,c]of Object.entries(L)){if(FAM.doneCmd[k])continue;FAM.doneCmd[k]=1;n++;try{famApply(c);}catch(e){console.error(e);}api('DELETE',`families/${FAM.fid}/cmd/${k}`).catch(()=>{});}if(n)famPublish(true);}
@@ -3271,6 +3292,7 @@ function famApply0(c){const r=c.rid?S.rabbits.find(x=>x.uid===c.rid):mainR();con
   if(c.k==='feed'&&r){const keep=mode;feed(r,c.type);if(keep!=='main'&&M)renderUI();cap(`${who}喂${r.name}吃东西`,3);}
   else if(c.k==='clean'){if(S.poops.length){S.poops=[];S.dirtySince=0;FX.push({k:'sweep',life:.9});cap(`${who}把兔舍打扫干净了`,3);}}
   else if(c.k==='med'&&r){if(r.sick){medicine(r);cap(`${who}帮${r.name}打针`,3);}}
+  else if(c.k==='sit'){famSitSet(c.h,who);}
   else if(c.k==='light'){S.light=!!c.v;cap(`${who}${S.light?'开了灯':'关了灯'}`,3);}
   else if(c.k==='pet'&&r){if(isMain(r))pet(r,{zone:c.zone});else{const v=vis(r);start(r,v,'purr');FX.push({k:'heart',x:v.x,y:v.y-18,life:1});}cap(`${who}摸了摸${r.name}`,2);}
   famMark();save();}
@@ -4125,9 +4147,9 @@ function giftGotScreen(x,from){const m=mainR();const verb={outfit:'穿上',acc:'
 // 两家的兔子都托给保姆、时间有重叠，而且感情到 SIT_MEET 以上，两位阿姨会带它们见面一起玩；
 // 主人把兔子接回来（或时间到送回来）后，打开游戏就会看到它们见面的画面。
 const SIT_MEET=50,SIT_MIN=10;
-function sitWindow(){const t=now();if(S.sitter&&S.sitter.until>t)return[S.sitter.at||S.sitter.until-2*60*MIN,S.sitter.until,1];
+function sitWindow(){const t=now();if(S.sitter&&S.sitter.until>t&&!S.sitter.home)return[S.sitter.at||S.sitter.until-2*60*MIN,S.sitter.until,1];
   const L=S.sitLast;if(L&&t-L.end<24*60*MIN)return[L.at,L.end,0];return 0;}
-function sitterEnd(t){t=t==null?now():t;const s=S.sitter;if(!s)return;const at=s.at||s.until-2*60*MIN,end=Math.min(t,s.until);
+function sitterEnd(t){t=t==null?now():t;const s=S.sitter;if(!s)return;if(s.home){S.sitter=null;return;}const at=s.at||s.until-2*60*MIN,end=Math.min(t,s.until);
   S.sitLast={at,end};S.sitMeetQ={at,end,t:now()};S.sitter=null;try{netMark();setTimeout(()=>{try{netPublish(true);}catch(e){}},50);}catch(e){}}
 function sitterMeets(q){const t=now(),out=[];
   for(const r of household()){if(r.stage==='nest'||r.guest)continue;let best=null;
