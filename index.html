@@ -794,6 +794,7 @@ function chooseAct(r,v){
 function updatePen(dt){
   try{outsideTick(dt);}catch(e){}
   try{birthTick(dt);}catch(e){console.error(e);}
+  try{playFlush();}catch(e){console.error(e);}
   try{toyUpdate(dt);if(WANT&&now()>WANT.until){const wr=byId(WANT.rid);WANT=null;if(wr&&mode==='main')cap(`${wr.name}等不到你摸摸，有点失望地走开了`,3);}}catch(e){}
   const mr=mainR();if(FOLLOW&&mr&&!PETD&&performance.now()<FOLLOW.until&&!isAsleep(mr,now())){const v=vis(mr);if(!v.hidden&&!(v.script&&v.script.length)&&Math.abs(FOLLOW.x-v.x)>hwOf(mr)+5&&['sit','stand','look','wash','loaf'].includes(v.act)){v.dir=FOLLOW.x>v.x?1:-1;if(mr.tr.brave>=55&&Math.abs(FOLLOW.x-v.x)>16&&v.act!=='hop'){goTo(mr,v,FOLLOW.x-(FOLLOW.x>v.x?10:-10),'stand',null,null,FOLLOW.y!=null?clamp(FOLLOW.y,FY0,FY1):v.y);if(!FOLLOW.told){FOLLOW.told=1;if(firstTime(mr,'follow',`${mr.name}好奇地跟着你的手指`,1.2))cap(`${mr.name}好奇地跟着你的手指走`,3);}}}}
   for(const r of visible()){const v=vis(r);v.t+=dt;const A=ACT[v.act];if(A&&A.u)A.u(r,v,dt);if(v.t>=v.dur){if(A&&A.e)A.e(r,v);if(v.next){const n=v.next;start(r,v,n.a,n.o);if(v.act==='hop'&&n.item)v.item=n.item;}else chooseAct(r,v);}}
@@ -1153,7 +1154,22 @@ const famView=()=>!!(FAM&&FAM.view&&S.fam);
 const careList=()=>household().filter(r=>!awayR(r)&&r.stage!=='nest');
 const dots4=v=>{const n=clamp(Math.round(v||0),0,4);return'●'.repeat(n)+'○'.repeat(4-n);};
 function careMed(r){if(famMirror()){famCmd({k:'med',rid:r.uid});sndOk();cap(`帮${r.name}打针了`);toMain();}else{toMain();medicine(r);}selIcon=-1;paintIcons();}
+let PLAYR=null,CARESKIP=false,PLAYW=null;
+// 跟着看的那边陪兔子玩：先记下玩之前的样子，回到主画面时把改变整理成一个指令送给在跑模拟的那台
+const PATCH_SKIP=new Set(['id','uid','born','g','seed','mom','dad','name','sex','gen','stage','nestId','famOwner','away','preg','partner','ancU','calls','mis','temp','guest']);
+const PATCH_CAP={happy:[0,4],hunger:[0,4],fiber:[0,6],fur:[0,100],nail:[0,100]};
+const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+function playDiff(a,b,top=true){const d={},st={};a=a||{};for(const k of Object.keys(b)){if(top&&PATCH_SKIP.has(k))continue;const x=a[k],y=b[k];if(JSON.stringify(x)===JSON.stringify(y))continue;
+  if(typeof x==='number'&&typeof y==='number'&&!(x>1e11||y>1e11))d[k]=y-x;
+  else if(isObj(x)&&isObj(y)){const q=playDiff(x,y,false);if(Object.keys(q.d).length)d[k]=q.d;if(Object.keys(q.st).length)st[k]=q.st;}
+  else st[k]=y===undefined?null:clone(y);}return{d,st};}
+function patchApply(o,d,st,top){for(const[k,v]of Object.entries(d||{})){if(isObj(v)){if(!isObj(o[k]))o[k]={};patchApply(o[k],v,null,false);continue;}if(typeof o[k]!=='number')o[k]=0;o[k]+=v;const cp=top&&PATCH_CAP[k];if(cp)o[k]=clamp(o[k],cp[0],cp[1]);}
+  for(const[k,v]of Object.entries(st||{})){if(isObj(v)&&isObj(o[k])&&!(d&&d[k]===undefined&&false)){patchApply(o[k],null,v,false);}else o[k]=v;}}
+function famPatch(c){const r=S.rabbits.find(x=>x.uid===c.rid);if(!r)return null;patchApply(r,c.d,c.st,true);famMark();return r;}
+function playFlush(){if(!PLAYW||mode!=='main'||M)return;const W0=PLAYW;PLAYW=null;const{d,st}=playDiff(W0.snap,W0.obj);if(!Object.keys(d).length&&!Object.keys(st).length)return;
+  const c={k:'patch',rid:W0.rid,d,st};if(famMirror())famCmd(c);else{famPatch(c);save();}}
 function carePick(id){const t=now(),L=careList();
+  if(id==='play'){const P=L.filter(r=>r.stage!=='nest');if(P.length<2)return false;setScreen(menu('和谁玩？',P.map(r=>({t:`${r.name} ${sexS(r)}`,s:`心情${'♥'.repeat(clamp(Math.round(r.happy||0),0,4))}${'♡'.repeat(4-clamp(Math.round(r.happy||0),0,4))}`,dis:isAsleep(r,t)?`嘘，${r.name}在睡觉`:null,on:()=>{PLAYR=r;CARESKIP=true;toMain();activate('play');}})),null,'选一只兔子'));return true;}
   if(id==='feed'){if(L.length<2)return false;setScreen(menu('喂谁？',L.map(r=>({t:`${r.name} ${sexS(r)}`,s:`肚子${dots4(r.hunger)}`,dis:isAsleep(r,t)?`嘘，${r.name}在睡觉`:null,on:()=>setScreen(feedMenu(r))})),null,'选一只兔子'));return true;}
   if(id==='med'){const sk=L.filter(r=>r.sick);if(!sk.length){cap('现在没有兔子生病');sndNo();selIcon=-1;paintIcons();return true;}
     if(sk.length===1){careMed(sk[0]);return true;}
@@ -1161,16 +1177,16 @@ function carePick(id){const t=now(),L=careList();
   if(id==='status'){const A=household().filter(r=>!awayR(r));if(A.length<2)return false;setScreen(menu('看谁的状态？',A.map(r=>({t:`${r.name} ${sexS(r)}`,s:`${STAGE_N[r.stage]} · 肚子${dots4(r.hunger)}`,on:()=>setScreen(profileScreen(r,()=>carePick('status')))})),null,'选一只兔子'));return true;}
   return false;}
 function activate(id){
-  if(famView()&&carePick(id))return;
+  if(famView()&&!CARESKIP&&carePick(id))return;CARESKIP=false;
   if(famMirror()){
     if(id==='light'){const v=!S.light;S.light=v;famCmd({k:'light',v});sndClick();cap(v?'开灯':'关灯');selIcon=-1;paintIcons();return;}
     if(id==='clean'){if(!S.poops.length){cap('兔舍很干净');sndNo();}else{famCmd({k:'clean'});S.poops=[];FX.push({k:'sweep',life:.9});sndOk();cap('打扫干净了！');}selIcon=-1;paintIcons();return;}
     if(id==='med'){const r=mainR();if(r&&r.sick){famCmd({k:'med',rid:r.uid});sndOk();cap(`帮${r.name}打针了`);}else{cap('现在没有兔子生病');sndNo();}selIcon=-1;paintIcons();return;}
-    if(id==='play'||id==='scold'){famBusy();selIcon=-1;paintIcons();return;}
+    if(id==='scold'){famBusy();selIcon=-1;paintIcons();return;}
   }
   if(id==='feed'){const r=needMain();if(!r)return;if(isAsleep(r,now())){cap(`嘘，${r.name}在睡觉`);sndNo();selIcon=-1;return;}setScreen(feedMenu(r));}
   else if(id==='light'){S.light=!S.light;sndClick();cap(S.light?'开灯':'关灯');selIcon=-1;save();if(!S.light)try{goodnight();}catch(e){}}
-  else if(id==='play'){const r=needMain();if(!r)return;const why=cantPlay(r,true);const PG=r.preg?`${r.name}怀孕了，别玩太激烈的`:null;if(why&&r.cold>now()&&!libBlock(r)){setScreen(menu('玩耍 · '+r.name,[{t:'兔子图书馆',s:'静一静',h:'它在生气不想玩，但可以带它去看静心的书，气会消',on:()=>libEnter(r)}],null,'它在生气'));return;}if(why){cap(why);sndNo();selIcon=-1;return;}setScreen(menu('玩耍 · '+r.name,()=>{const L=GAMES.map(x=>({t:x.n,s:x.s+(bestOf(x.id)?` · 最高${bestOf(x.id)}`:''),dis:PG,on:()=>x.f(r)}));if((r.tricks||[]).length)L.unshift({t:'叫它表演',s:`会${r.tricks.length}种把戏`,dis:PG,on:()=>setScreen(trickMenu(r))});L.unshift({t:'剪指甲',s:`指甲 ${Math.round(r.nail||0)}%`,dis:nailBlock(r),on:()=>setScreen(nailScreen(r))});L.unshift({t:'梳毛',s:`毛乱 ${Math.round(r.fur||0)}%`,dis:groomBlock(r),on:()=>setScreen(groomScreen(r))});L.unshift({t:'兔子图书馆',s:'看书・躲猫猫',dis:libBlock(r),h:'看书能学新把戏、让脾气变好；看太多会近视',on:()=>libEnter(r)});L.unshift({t:'兔子训练',s:`体力 ${fitDots(r)}`,dis:sportBlock(r),h:'练速度、弹跳、食量，练得越高运动会越容易赢',on:()=>setScreen(trainMenu(r))});L.unshift({t:'兔子运动会',s:'5个项目',dis:sportBlock(r),h:'冲刺跑、障碍赛、跳高、跳远、啃胡萝卜；可以自己比，也能约好友同场',on:()=>setScreen(sportMenu(r))});L.unshift({t:'兔子公园',s:'和好友相遇',dis:mpBlock(),h:'进公园就能遇到在线好友的兔子',on:()=>parkScreen()});L.unshift({t:'约好友抢胡萝卜',s:'实时对战',dis:PG||mpBlock()||(Object.keys(netS().friends).some(fu=>isFresh(NET.live[fu]))?null:'现在没有在线的好友'),on:()=>setScreen(menu('约谁玩？',Object.entries(netS().friends).filter(([fu])=>isFresh(NET.live[fu])).map(([fu,f])=>({t:f.nick,s:'在线',on:()=>inviteCarrot(fu)})),null))});L.unshift({t:'叫它的名字',s:nameTxt(r),dis:callBlock(r),h:'叫一声它的名字；常叫、跑来时摸摸它，它会越来越认得',on:()=>callName(r)});L.unshift({t:'挖宝乐',s:`小铲子${shovels()}把`,dis:digBlock(r),h:'去樱花林、海边……挖衣服、饰品、墙饰和家具',on:()=>setScreen(digMenu(r))});L.unshift({t:'带它去散步',s:'出门走走',dis:walkBlock(r),on:()=>setScreen(walkMenu(r))});if(PG){const ok=['带它去散步','梳毛','剪指甲','兔子图书馆','叫它的名字','挖宝乐','兔子公园'];L.sort((a,b)=>(ok.includes(a.t)?0:1)-(ok.includes(b.t)?0:1));}return L;},null,r.preg?'怀孕中':`${GAMES.length}个游戏`));}
+  else if(id==='play'){const r=PLAYR||needMain();PLAYR=null;if(!r)return;if(famView())PLAYW={rid:r.uid,snap:clone(r),obj:r};const FM=famMirror()?'跟着看的时候不能用，等你接手再玩':null;const why=cantPlay(r,true);const PG=r.preg?`${r.name}怀孕了，别玩太激烈的`:null;if(why&&r.cold>now()&&!libBlock(r)){setScreen(menu('玩耍 · '+r.name,[{t:'兔子图书馆',s:'静一静',h:'它在生气不想玩，但可以带它去看静心的书，气会消',on:()=>libEnter(r)}],null,'它在生气'));return;}if(why){cap(why);sndNo();selIcon=-1;return;}setScreen(menu('玩耍 · '+r.name,()=>{const L=GAMES.map(x=>({t:x.n,s:x.s+(bestOf(x.id)?` · 最高${bestOf(x.id)}`:''),dis:PG,on:()=>x.f(r)}));if((r.tricks||[]).length)L.unshift({t:'叫它表演',s:`会${r.tricks.length}种把戏`,dis:PG,on:()=>setScreen(trickMenu(r))});L.unshift({t:'剪指甲',s:`指甲 ${Math.round(r.nail||0)}%`,dis:nailBlock(r),on:()=>setScreen(nailScreen(r))});L.unshift({t:'梳毛',s:`毛乱 ${Math.round(r.fur||0)}%`,dis:groomBlock(r),on:()=>setScreen(groomScreen(r))});L.unshift({t:'兔子图书馆',s:'看书・躲猫猫',dis:libBlock(r),h:'看书能学新把戏、让脾气变好；看太多会近视',on:()=>libEnter(r)});L.unshift({t:'兔子训练',s:`体力 ${fitDots(r)}`,dis:sportBlock(r),h:'练速度、弹跳、食量，练得越高运动会越容易赢',on:()=>setScreen(trainMenu(r))});L.unshift({t:'兔子运动会',s:'5个项目',dis:FM||sportBlock(r),h:'冲刺跑、障碍赛、跳高、跳远、啃胡萝卜；可以自己比，也能约好友同场',on:()=>setScreen(sportMenu(r))});L.unshift({t:'兔子公园',s:'和好友相遇',dis:FM||mpBlock(),h:'进公园就能遇到在线好友的兔子',on:()=>parkScreen()});L.unshift({t:'约好友抢胡萝卜',s:'实时对战',dis:FM||PG||mpBlock()||(Object.keys(netS().friends).some(fu=>isFresh(NET.live[fu]))?null:'现在没有在线的好友'),on:()=>setScreen(menu('约谁玩？',Object.entries(netS().friends).filter(([fu])=>isFresh(NET.live[fu])).map(([fu,f])=>({t:f.nick,s:'在线',on:()=>inviteCarrot(fu)})),null))});L.unshift({t:'叫它的名字',s:nameTxt(r),dis:callBlock(r),h:'叫一声它的名字；常叫、跑来时摸摸它，它会越来越认得',on:()=>callName(r)});L.unshift({t:'挖宝乐',s:`小铲子${shovels()}把`,dis:digBlock(r),h:'去樱花林、海边……挖衣服、饰品、墙饰和家具',on:()=>setScreen(digMenu(r))});L.unshift({t:'带它去散步',s:'出门走走',dis:walkBlock(r),on:()=>setScreen(walkMenu(r))});if(PG){const ok=['带它去散步','梳毛','剪指甲','兔子图书馆','叫它的名字','挖宝乐','兔子公园'];L.sort((a,b)=>(ok.includes(a.t)?0:1)-(ok.includes(b.t)?0:1));}return L;},null,r.preg?'怀孕中':`${GAMES.length}个游戏`));}
   else if(id==='med'){const r=needMain();if(!r)return;medicine(r);selIcon=-1;}
   else if(id==='clean'){if(!S.poops.length){cap('兔舍很干净');sndNo();}else{S.poops=[];S.dirtySince=0;dn(mainR(),'clean');addCoins(2,'打扫',1);FX.push({k:'sweep',life:.9});sndOk();cap('打扫干净了！');tutDone(3);}selIcon=-1;save();}
   else if(id==='status'){const r=mainR();if(!r){sndNo();return;}setScreen(profileScreen(r,null,S.tut===4?1:0));tutDone(4);}
@@ -3159,7 +3175,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.02h';
+const GAME_VER='2026.11.03a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3192,7 +3208,7 @@ const famMirror=()=>{if(!FAM||!FAM.view||FAM.holder)return false;if(FAM.role==='
 const famInView=()=>!!(FAM&&FAM.view);
 function famOtherNick(){const i=S.fam&&S.fam.info;if(!i)return'朋友';return S.fam.role==='host'?i.guestNick:i.hostNick;}
 function famHostNick(){const i=S.fam&&S.fam.info;return i?(S.fam.role==='host'?(S.nick||'你'):i.hostNick):'';}
-function famBusy(why){cap(`${famOtherNick()}正在照顾这一家，${why||'这个等你接手的时候再做'}\n你可以喂食、打扫、打针、开关灯、摸摸`,4);sndNo();}
+function famBusy(why){cap(`${famOtherNick()}正在照顾这一家，${why||'这个等你接手的时候再做'}\n你可以喂食、打扫、打针、开关灯、摸摸、陪它玩`,4);sndNo();}
 // ---- 生宝宝时（母兔这边）
 function famBirth(m,pr,kids,t){if(SIMQ||!pr.dadFu||!pr.dadUid)return;
   S.famQ={dadFu:pr.dadFu,dadU:pr.dadUid,dadName:pr.dadName||'爸爸',born:t,wean:t+NURSE*MIN,kits:kids.map(k=>k.uid),momU:m.uid,momName:m.name,momId:m.id};}
@@ -3307,6 +3323,7 @@ function famApply0(c){const r=c.rid?S.rabbits.find(x=>x.uid===c.rid):mainR();con
   else if(c.k==='clean'){if(S.poops.length){S.poops=[];S.dirtySince=0;FX.push({k:'sweep',life:.9});cap(`${who}把兔舍打扫干净了`,3);}}
   else if(c.k==='med'&&r){if(r.sick){medicine(r);cap(`${who}帮${r.name}打针`,3);}}
   else if(c.k==='sit'){famSitSet(c.h,who);}
+  else if(c.k==='patch'){const pr=famPatch(c);if(pr)cap(`${who}陪${pr.name}玩了一会儿`,3);}
   else if(c.k==='light'){S.light=!!c.v;cap(`${who}${S.light?'开了灯':'关了灯'}`,3);}
   else if(c.k==='pet'&&r){if(isMain(r))pet(r,{zone:c.zone});else{const v=vis(r);start(r,v,'purr');FX.push({k:'heart',x:v.x,y:v.y-18,life:1});}cap(`${who}摸了摸${r.name}`,2);}
   famMark();save();}
