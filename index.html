@@ -1493,6 +1493,7 @@ function familyMenu(){
     }
     L.push({t:'朋友联机',s:'兔子码',h:'串门、相亲、送礼物、送宝宝',on:()=>setScreen(netMenu())});
     const sit=S.sitter&&S.sitter.until>t;
+    if(famView())for(const x of reviveList())L.unshift({t:`🌙 让${x.name}回来`,s:'出错的补偿',h:`${x.name}是因为系统出错才走的，可以把它找回来`,on:()=>setScreen(confirmScr(`让${x.name}回来`,`把${esc(x.name)}找回来？`,()=>reviveStart(x),()=>setScreen(familyMenu())))});
     if(famView()){L.push(homeSit()?{t:'让保姆阿姨回去',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('让保姆回去','让保姆阿姨现在就回去？',()=>{famSitter(0);},()=>setScreen(familyMenu())))}:{t:'请保姆来家里',s:'两家一起用',h:'保姆阿姨会来家里照顾这一家子，你们两个都不用另外请',dis:sitAway()?'兔子们在邻居家':null,on:()=>setScreen(homeSitMenu())});}
     else L.push(sit?{t:'接兔子回来',s:`还剩${durText(S.sitter.until-t)}`,on:()=>setScreen(confirmScr('接兔子回来','现在就从邻居阿姨家把兔子们接回来？',()=>{sitterEnd();save();cap('你把兔子们接回来了！');sndOk();toMain();},()=>setScreen(familyMenu())))}:{t:'请邻居照顾',s:'出门时用',h:'出门或睡觉前托管：兔子们会去邻居家，时间到了送回来',on:()=>setScreen(sitterMenu())});
     return L;};
@@ -3175,7 +3176,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.03a';
+const GAME_VER='2026.11.04a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3204,7 +3205,10 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 function homeOf(o){const h={};for(const k of HOME_KEYS)if(o[k]!==undefined)h[k]=o[k];return h;}
 function personalOf(o){const p={};for(const k of Object.keys(o))if(!HOME_KEYS.includes(k))p[k]=o[k];return p;}
 function realSave(){return FAM&&FAM.own?Object.assign(personalOf(S),FAM.own):S;}
-const famMirror=()=>{if(!FAM||!FAM.view||FAM.holder)return false;if(FAM.role==='guest')return true;const L=FAM.data&&FAM.data.lock;return !!(L&&L.uid!==famUid()&&L.until>Date.now());};
+const FAM_BOOT=performance.now();
+// 还没收到这个家的最新资料前，不可以用手机里旧的资料自己跑时间（以前会把几个小时当成没人照顾，兔子就饿死了）
+const famMirror=()=>{if(!FAM)return !!(S.fam&&(S.fam.role==='host'||S.fam.viewFam!==false));if(!FAM.view||FAM.holder)return false;if(FAM.role==='guest')return true;
+  return !(performance.now()-FAM_BOOT>45000&&!netOn());};
 const famInView=()=>!!(FAM&&FAM.view);
 function famOtherNick(){const i=S.fam&&S.fam.info;if(!i)return'朋友';return S.fam.role==='host'?i.guestNick:i.hostNick;}
 function famHostNick(){const i=S.fam&&S.fam.info;return i?(S.fam.role==='host'?(S.nick||'你'):i.hostNick):'';}
@@ -3262,6 +3266,7 @@ function famOnData(d){if(!FAM)return;FAM.data=d||{};const me=famUid();
   const st=d&&d.state;
   const H=famHomeOf(st);if(FAM.role==='guest'&&FAM.view&&!FAM.own&&H)famEnterView(H);
   if(H&&st.ver>(FAM.ver||0)&&st.by!==me&&!FAM.holder){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(H));}catch(e){}}
+  famAliveSave();
   if(FAM.holder){famTakeFather(d);famTakeCmds(d);famCheckSplit(d);}}
 // ---- 跑模拟的那台：轮流接手
 async function famTick(){if(!FAM||!netOn()||!NET.tok)return;const me=famUid(),t=Date.now();
@@ -3271,10 +3276,10 @@ async function famTick(){if(!FAM||!netOn()||!NET.tok)return;const me=famUid(),t=
     famCheckSplit(FAM.data||{});if(FAM&&(FAM.dirty||t-FAM.pubAt>60000))famPublish(false);return;}
   const L=FAM.data&&FAM.data.lock;if(!FAM.data)return;
   if(!L||L.uid===me||!(L.until>t)){try{await api('PUT',`families/${FAM.fid}/lock`,{uid:me,until:t+45000});}catch(e){return;}
-    FAM.hb=t;const st=FAM.data.state,H=famHomeOf(st);if(H&&st.ver>(FAM.ver||0)&&st.by!==me){Object.assign(S,H);FAM.ver=st.ver;}
+    FAM.hb=t;const st=FAM.data.state,H=famHomeOf(st);if(H&&st.ver>(FAM.ver||0)&&st.by!==me){Object.assign(S,H);FAM.ver=st.ver;}famGapSitter();
     FAM.holder=true;const prev=mode;tick(false);famTakeFather(FAM.data);famTakeCmds(FAM.data);famCheckSplit(FAM.data);famPublish(true);
     if(prev==='main'&&mode==='main')cap(`现在由你照顾${famHostNick()}家的兔子`,3);}}
-async function famPublish(force){if(!FAM||!FAM.holder)return;const t=Date.now();if(!force&&t-FAM.pubAt<15000)return;
+async function famPublish(force){if(!FAM||!FAM.holder)return;famAliveSave();const t=Date.now();if(!force&&t-FAM.pubAt<15000)return;
   const home=clone(homeOf(S));if(Array.isArray(home.log))home.log=home.log.slice(-40);
   const st={ver:(FAM.ver||0)+1,t:S.t,by:famUid(),at:{'.sv':'timestamp'},j:JSON.stringify(home)};FAM.ver=st.ver;FAM.pubAt=t;FAM.dirty=false;
   if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(home));}catch(e){}
@@ -3309,6 +3314,42 @@ function drawHomeSitter(){const T=performance.now()/1000,span=WW-50,ph=T/12;
   // 脸（朝前方三分之一）
   const blink=Math.floor(T*1.7)%7===0;R(0,18+k,1,blink?1:2,INK);R(3,18+k,1,blink?1:2,INK);R(3,21+k,1,1,'#e9a0a0');R(-1,21+k,1,1,'#e9a0a0');R(1,22+k,2,1,'#c06a6a');
   if(kneel&&Math.floor(T*2)%3===0)bm('heart',dir>0?x+10:x-14,38);}
+// 两个人都不在的时候，保姆阿姨会来家里照顾；有人接手时，中间那段时间算有人照顾
+function famGapSitter(){const t=now();if(t-S.t>30*MIN&&!(S.sitter&&S.sitter.until>S.t)){S.sitter={at:S.t,until:t,home:1,by:'',auto:1};}}
+// 每只还活着的兔子都在手机里留一份（两家一起带的期间），万一出错还能找回来
+let ALIVE_AT=0;
+function famAliveSave(force){if(!S.fam)return;const tn=Date.now();if(!force&&tn-ALIVE_AT<30000)return;ALIVE_AT=tn;
+  try{const L=JSON.parse(localStorage.getItem('tuwo_famalive')||'{}');for(const r of S.rabbits){if(r.temp||r.guest||r.stage==='nest')continue;L[r.uid]={at:tn,fid:S.fam.fid,main:r.id===S.mainId,j:JSON.stringify(r)};}
+    for(const k of Object.keys(L))if(tn-L[k].at>7*86400000)delete L[k];localStorage.setItem('tuwo_famalive',JSON.stringify(L));}catch(e){}
+  for(const h of Object.values(S.hist||{}))if(h.end&&(h.cause==='hunger'||h.cause==='sick')&&S.rabbits.some(r=>r.uid===h.uid)){h.end=null;h.cause=null;}}
+function famAliveSeed(){try{const h=JSON.parse(localStorage.getItem('tuwo_famhome')||'null');if(!h||!S.fam)return;const L=JSON.parse(localStorage.getItem('tuwo_famalive')||'{}');const tn=Date.now();
+  for(const r of(h.rabbits||[]))if(r&&r.uid&&!L[r.uid]&&r.stage!=='nest')L[r.uid]={at:tn,fid:S.fam.fid,main:r.id===h.mainId,j:JSON.stringify(r)};localStorage.setItem('tuwo_famalive',JSON.stringify(L));}catch(e){}}
+// 最近因为没吃东西或生病走掉、可以找回来的兔子
+function reviveList(){if(!S.fam)return[];const t=now(),out=[],seen=new Set();let L={};try{L=JSON.parse(localStorage.getItem('tuwo_famalive')||'{}');}catch(e){}
+  const alive=u=>S.rabbits.some(r=>r.uid===u);
+  for(const h of Object.values(S.hist||{}))if(h.end&&(h.cause==='hunger'||h.cause==='sick')&&t-h.end<4*1440*MIN&&h.uid&&!alive(h.uid)&&!seen.has(h.uid)){seen.add(h.uid);out.push({uid:h.uid,name:h.name,h});}
+  const died=new Set((S.log||[]).filter(e=>t-e.t<4*1440*MIN).map(e=>(/^(.+?)(安详地)?回到月亮上了$/.exec(e.msg)||[])[1]).filter(Boolean));
+  for(const q of S.moonQ||[])if(q.cause==='hunger'||q.cause==='sick')died.add(q.name);
+  for(const[u,e]of Object.entries(L)){if(seen.has(u)||alive(u)||e.fid!==S.fam.fid)continue;let r=null;try{r=JSON.parse(e.j);}catch(_){}if(r&&died.has(r.name)){seen.add(u);out.push({uid:u,name:r.name});}}
+  return out;}
+function reviveRebuild(h){let p=null;for(let i=0;i<20000;i++){const q=genPersona();if(titleP(q)===h.title){p=q;break;}}
+  const r=newRabbit({g:h.g,born:h.born,stage:h.stage||'adult',mom:h.mom,dad:h.dad,gen:h.gen,name:h.name,sex:h.sex,p:p||undefined});S.nextId--;
+  Object.assign(r,{id:h.id,uid:h.uid,seed:h.seed,ancU:h.ancU||[]});return r;}
+async function reviveFind(x){let L={};try{L=JSON.parse(localStorage.getItem('tuwo_famalive')||'{}');}catch(e){}
+  if(L[x.uid])return{j:L[x.uid].j,src:'手机里的记录'};
+  try{const n=netS();if(n&&n.uid&&netOn()){const sv=await api('GET','saves/'+n.uid);if(sv&&sv.c){const rr=await readSave(sv.c);const r=rr.s&&rr.s.rabbits.find(q=>q.uid===x.uid);if(r)return{j:JSON.stringify(r),src:'服务器备份'};}}}catch(e){}
+  if(x.h)return{j:JSON.stringify(reviveRebuild(x.h)),src:'家谱'};return null;}
+function reviveApply(j,who){let r=null;try{r=JSON.parse(j);}catch(e){return;}if(!r||!r.uid||S.rabbits.some(x=>x.uid===r.uid))return;
+  const oid=r.id;if(S.rabbits.some(x=>x.id===r.id)){r.id=S.nextId++;for(const k of S.rabbits)if(k.mom===oid)k.mom=r.id;for(const n of S.nests)if(n.mom===oid)n.mom=r.id;}
+  Object.assign(r,{hunger:4,happy:Math.max(3,r.happy||0),sick:null,zh:0,sm:0,fz:0,mis:null,cold:0,scared:0,away:null,temp:false});if(!Array.isArray(r.sugar))r.sugar=[];if(!r.calls)r.calls={};
+  const kitsNursing=S.nests.some(n=>n.mom===r.id);if(r.sex==='f'&&kitsNursing&&!(r.nurse>now()))r.nurse=now()+NURSE*MIN;
+  S.moonQ=(S.moonQ||[]).filter(q=>q.id!==oid&&q.name!==r.name);
+  const cur=mainR();const wasMain=S.prevMain===oid||!cur||(cur&&cur.mom===r.id&&cur.stage!=='adult');S.rabbits.push(r);if(wasMain){S.mainId=r.id;if(S.prevMain===oid)S.prevMain=null;}
+  if(S.hist&&S.hist[r.id]){S.hist[r.id].end=null;S.hist[r.id].cause=null;}try{histOf(r);}catch(e){}VIS.delete(r.id);
+  const m=`${r.name}回来了！${who?who+'把它找回来了，':''}以后两个人都不在的时候，保姆阿姨会来照顾`;log(now(),m);if(mode==='main'||mode==='moon')toMain();cap(m,6);sndCute();famMark();save();try{famPublish(true);}catch(e){}}
+async function reviveStart(x){cap(`正在找${x.name}……`,3);const f=await reviveFind(x);if(!f){cap(`找不到${x.name}的资料`,4);sndNo();return;}
+  if(famMirror()){famCmd({k:'revive',j:f.j});toMain();cap(`${x.name}回来了！（从${f.src}找回）\n${famOtherNick()}那边也会看到`,6);sndCute();try{let L=JSON.parse(localStorage.getItem('tuwo_famalive')||'{}');}catch(e){}return;}
+  reviveApply(f.j,'');}
 function homeSitMenu(){return menu('请保姆来家里',[2,4,6,8,10,12].map(h=>({t:`${h}小时`,s:'喂饭、打扫、看病',on:()=>{setScreen(confirmScr('请保姆来家里',`请保姆阿姨来家里照顾${h}小时？\n两家都算，不用另外请`,()=>famSitter(h),()=>setScreen(homeSitMenu())));}})),()=>setScreen(familyMenu()),'两家一起用');}
 function famSitSet(h,by){const t=now();if(h>0){S.sitter={at:t,until:t+h*60*MIN,home:1,by:String(by||'').slice(0,8)};const m=`${by||'你'}请了保姆阿姨来家里照顾${h}小时`;log(t,m);if(mode==='main')cap(m,4);}
   else if(S.sitter&&S.sitter.home){S.sitter=null;const m=`保姆阿姨回家了`;log(t,m);if(mode==='main')cap(m,3);}famMark();}
@@ -3323,6 +3364,7 @@ function famApply0(c){const r=c.rid?S.rabbits.find(x=>x.uid===c.rid):mainR();con
   else if(c.k==='clean'){if(S.poops.length){S.poops=[];S.dirtySince=0;FX.push({k:'sweep',life:.9});cap(`${who}把兔舍打扫干净了`,3);}}
   else if(c.k==='med'&&r){if(r.sick){medicine(r);cap(`${who}帮${r.name}打针`,3);}}
   else if(c.k==='sit'){famSitSet(c.h,who);}
+  else if(c.k==='revive'){reviveApply(c.j,who);}
   else if(c.k==='patch'){const pr=famPatch(c);if(pr)cap(`${who}陪${pr.name}玩了一会儿`,3);}
   else if(c.k==='light'){S.light=!!c.v;cap(`${who}${S.light?'开了灯':'关了灯'}`,3);}
   else if(c.k==='pet'&&r){if(isMain(r))pet(r,{zone:c.zone});else{const v=vis(r);start(r,v,'purr');FX.push({k:'heart',x:v.x,y:v.y-18,life:1});}cap(`${who}摸了摸${r.name}`,2);}
@@ -4969,6 +5011,7 @@ function checkQueue(){
 }
 function tick(first){
   if(famMirror())return;
+  if(S.fam&&FAM&&FAM.view)famGapSitter();
   const target=now();if(S.t>target+5*MIN)S.t=Math.floor(target/MIN)*MIN;if(target-S.t<MIN&&!first)return;
   const logN=S.log.length;
   LIVE=!first&&(target-S.t)<3*MIN;liveEvents=[];
@@ -5068,7 +5111,7 @@ window.addEventListener('resize',layout);
 
 /* ================= boot ================= */
 function boot(){
-  load();try{if(S.fam)famStart();}catch(e){}if(S.tut===5)S.tut=-1;applyShell();buildIcons();paintTick();renderStrip();layout();
+  load();try{famAliveSeed();famAliveSave(true);}catch(e){}try{if(S.fam)famStart();}catch(e){}if(S.tut===5)S.tut=-1;applyShell();buildIcons();paintTick();renderStrip();layout();
   if(!S.started)showStart();
   else{const gap=now()-S.t;tick(true);if(gap<10*MIN)checkQueue();}
   renderStrip();
