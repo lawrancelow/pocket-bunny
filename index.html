@@ -351,7 +351,7 @@ function stepAge(r,t){
   else if(r.stage==='adult'&&age>=ELDER_AT)grow(r,'elder',t);
   if(age>=r.life*1440)die(r,t,'old');
 }
-function stepFamily(r,t){if(r.stage==='nest'||isAsleep(r,t))return;r.tm.poop+=1;if(r.tm.poop>=150){r.tm.poop=0;addPoop();}}
+function stepFamily(r,t){if(r.stage==='nest'||isAsleep(r,t)||awayR(r,t))return;r.tm.poop+=1;if(r.tm.poop>=150){r.tm.poop=0;addPoop();}}
 function stepPreg(r,t){
   if(!r.preg)return;const el=(t-r.preg.at)/MIN;
   if(el>=PREG_NEST&&!r.preg.nest){r.preg.nest=true;pregNestX(r);const m=`${r.name}开始叼草、扯毛做窝，快生了`;log(t,m);emit(m,'good');}
@@ -396,7 +396,7 @@ function stepMain(r,t,sit){
   r.tm.h+=f;if(r.tm.h>=iv.h){r.tm.h-=iv.h;if(r.hunger>0)r.hunger--;}
   r.tm.p+=f;if(r.tm.p>=iv.p){r.tm.p-=iv.p;if(r.happy>0)r.happy--;}
   r.tm.f+=f;if(r.tm.f>=90){r.tm.f-=90;if(r.fiber>0)r.fiber--;}
-  if(!asleep){r.tm.poop+=1;if(r.tm.poop>=iv.poop){r.tm.poop=0;addPoop();}}
+  if(!asleep&&!awayR(r,t)){r.tm.poop+=1;if(r.tm.poop>=iv.poop){r.tm.poop=0;addPoop();}}
   r.sugar=r.sugar.filter(x=>t-x<120*MIN);
   if(sit){
     if(r.hunger<=1){r.hunger=Math.min(4,r.hunger+2);r.fiber=Math.min(6,r.fiber+2);}
@@ -452,6 +452,8 @@ function stepMinute(t){
     if(isMain(r))stepMain(r,t,sit||awayR(r,t));else stepFamily(r,t);
     if(S.rabbits.includes(r))stepPreg(r,t);
   }
+  // 兔子都不在家（出门、去别人家带宝宝、在邻居家）就不会有便便；保姆来家里时会顺手打扫
+  {const H=household();if(S.poops.length&&((H.length&&H.every(r=>awayR(r,t)))||homeSit(t))){S.poops=[];S.dirtySince=0;}}
   for(const g of S.rabbits.filter(r=>r.guest)){if(t>=g.leaveAt){try{sendBackReport(g,false);}catch(e){}S.rabbits.splice(S.rabbits.indexOf(g),1);VIS.delete(g.id);const m=`${g.name}玩够了，回${g.owner}家了`;log(t,m);emit(m,'good');}}
   for(const n of S.nests.slice()){
     if(n.pick)continue;
@@ -3176,7 +3178,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.04a';
+const GAME_VER='2026.11.05a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
