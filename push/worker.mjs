@@ -42,6 +42,8 @@ async function main(){
   }
   for(const[k,t]of Object.entries(st.sent))if(now-t>2*86400000)delete st.sent[k];
   st.last=now;fs.writeFileSync(STATE,JSON.stringify(st));
+  {let rb=0,a1=0,a7=0,np=0;for(const p of Object.values(players)){if(!p||typeof p!=='object')continue;np++;rb+=Object.keys(p.rb||{}).length;const ago=now-(p.at||0);if(ago<864e5)a1++;if(ago<7*864e5)a7++;}
+   console.log(`统计：服务器上 ${np} 位玩家，共 ${rb} 只兔子；24 小时内上线 ${a1} 位，7 天内上线 ${a7} 位`);}
   console.log(`检查了 ${Object.keys(players).length} 位玩家（${subs} 位开了手机通知），发了 ${n} 则通知${next?`，下一则约 ${Math.round((next-now)/60000)} 分钟后`:''}${dead?`，${dead} 个订阅已失效`:''}`);
 }
 main().catch(e=>{console.error(e);fs.writeFileSync(STATE,JSON.stringify(st));process.exit(1);});
