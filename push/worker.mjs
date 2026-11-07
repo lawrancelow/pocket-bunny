@@ -44,6 +44,12 @@ async function main(){
   st.last=now;fs.writeFileSync(STATE,JSON.stringify(st));
   {let rb=0,a1=0,a7=0,np=0;for(const p of Object.values(players)){if(!p||typeof p!=='object')continue;np++;rb+=Object.keys(p.rb||{}).length;const ago=now-(p.at||0);if(ago<864e5)a1++;if(ago<7*864e5)a7++;}
    console.log(`统计：服务器上 ${np} 位玩家，共 ${rb} 只兔子；24 小时内上线 ${a1} 位，7 天内上线 ${a7} 位`);}
+  // 每位玩家：开始玩的时间（最老那只兔子出生的时候）、最后上线、兔子数、好友关系。只认得出豆沙和嘟嘟两家，其他人不印名字
+  {const kl=ms=>new Date(ms+8*3600e3).toISOString().slice(5,16).replace('T',' ');const E=Object.entries(players).filter(([u,p])=>p&&typeof p==='object');const lab={};let k=0;
+   for(const[u,p]of E){const nms=Object.values(p.rb||{}).map(x=>x&&x.p&&x.p.nm);lab[u]=nms.includes('豆沙')?'豆沙家':nms.includes('嘟嘟')?'嘟嘟家':`玩家${++k}`;}
+   for(const[u,p]of E){const ags=Object.values(p.rb||{}).map(x=>+(x&&x.p&&x.p.ag)||0);const start=ags.length?(p.at||0)-Math.max(...ags)*60000:0;
+     const fr=(p.fr||[]).map(f=>lab[f]||'别人').join('、')||'没有';
+     console.log(`  ${lab[u]}：开始玩约 ${start?kl(start):'不明'}，最后上线 ${p.at?kl(p.at):'不明'}，兔子 ${Object.keys(p.rb||{}).length} 只，好友：${fr}`);}}
   console.log(`检查了 ${Object.keys(players).length} 位玩家（${subs} 位开了手机通知），发了 ${n} 则通知${next?`，下一则约 ${Math.round((next-now)/60000)} 分钟后`:''}${dead?`，${dead} 个订阅已失效`:''}`);
 }
 main().catch(e=>{console.error(e);fs.writeFileSync(STATE,JSON.stringify(st));process.exit(1);});
