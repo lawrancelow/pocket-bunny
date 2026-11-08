@@ -24,6 +24,8 @@ async function main(){
   const tok=await token();
   const r=await fetch(`${DB}/players.json?auth=${encodeURIComponent(tok)}`);if(!r.ok)throw new Error('read '+r.status);
   const players=await r.json()||{};
+  try{for(const c of ['VD5XTZ','A2P3U6']){const q=await fetch(`${DB}/codes/${c}.json?auth=${encodeURIComponent(tok)}`);const u=await q.json();const p=u&&players[u];
+    console.log(`好友码检查 ${c}：${u?'有登记':'没有登记'}${u?(p?`，玩家资料在，${Object.keys(p.rb||{}).length} 只兔子，资料里的码${p.code===c?'一致':'不一致'}，最后上线 ${new Date((p.at||0)+8*3600e3).toISOString().slice(5,16)}`:'，但找不到玩家资料'):''}`);}}catch(e){console.log('好友码检查失败',String(e));}
   // 上次跑到哪里；第一次（或太久没跑）只看最近 20 分钟，避免补发一大堆旧通知
   const from=Math.max(st.last||0,now-20*60000);
   st.sent=st.sent||{};let n=0,dead=0,subs=0,next=0;
