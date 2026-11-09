@@ -132,8 +132,10 @@ body{background:radial-gradient(ellipse 80% 60% at 50% 45%,var(--page-hi),transp
 'use strict';
 /* ================= constants ================= */
 const W=96,H=64,MIN=60000;
-const NEST_EYES=240,NEST_END=720,KIT_END=3*1440,JUN_END=7*1440,ELDER_AT=22*1440,LIFE_MIN=30,LIFE_MAX=38;
-const PREG_NEST=1200,PREG_LEN=1440,NURSE=3*1440,CAP=8;
+const NEST_EYES=320,NEST_END=960,KIT_END=4*1440,JUN_END=9*1440,ELDER_AT=29*1440,LIFE_MIN=40,LIFE_MAX=51;
+// 2026.11.10a 起寿命至少 40 天：旧兔子的寿命按 40/30 放大一次（每只兔子身上记 l40，跟着兔子走，联机、两家一起带、备份还原都不会重复放大）
+function lifeFix(r){if(!r||r.l40)return;r.l40=1;if(r.life!=null)r.life=clamp(r.life*4/3,LIFE_MIN,LIFE_MAX);}
+const PREG_NEST=1200,PREG_LEN=1440,NURSE=KIT_END,CAP=8;
 const INK='#2a2722',LCDC='#cfd7b8',NIGHT_INK='#e5ebd2';
 const KEY='pocketBunny.v2';
 const IDEAL={nest:60,kit:300,junior:1000,adult:2000,elder:1900};
@@ -252,8 +254,8 @@ function uniquePersona(mom,dad,taken){let p;for(let i=0;i<60;i++){p=genPersona(m
 let S=null,DBG=0;
 const now=()=>Date.now()+DBG;
 function fresh(){return{v:2,t:Math.floor(now()/MIN)*MIN,nextId:1,nextNest:1,rabbits:[],mainId:null,prevMain:null,nests:[],poops:[],dirtySince:0,light:true,calls:{},sitter:null,suitors:null,sound:true,log:[],dex:{},hist:{},seen:{},moonQ:[],tut:0,started:false,best:{},shell:'lavender',nick:'',usedCodes:[],myCodes:[],album:[],treasures:{},sup:{last:{}},decor:{},pendQ:[],gift:null};}
-function migrate(){if((S.lifeV||1)<2){S.lifeV=2;const t=now();for(const r of S.rabbits){if(r.life!=null)r.life=clamp(r.life+18,LIFE_MIN,LIFE_MAX);if(r.stage==='elder'&&(t-r.born)/MIN<ELDER_AT)r.stage='adult';}}for(const r of S.rabbits){if(!r.uid)r.uid=rid();}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
-function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(o&&o.v===2){S=Object.assign(fresh(),o);migrate();return;}}}catch(e){}S=fresh();S.lifeV=2;}
+function migrate(){if((S.lifeV||1)<2){S.lifeV=2;const t=now();for(const r of S.rabbits){if(r.life!=null)r.life=clamp(r.life+18,30,38);if(r.stage==='elder'&&(t-r.born)/MIN<ELDER_AT)r.stage='adult';}}if(S.lifeV<3){S.lifeV=3;const t=now();for(const r of S.rabbits){lifeFix(r);if(r.nurse>t)r.nurse+=1440*MIN;}if(S.famQ&&S.famQ.wean>t)S.famQ.wean+=1440*MIN;}for(const r of S.rabbits){if(!r.uid)r.uid=rid();}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
+function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(o&&o.v===2){S=Object.assign(fresh(),o);migrate();return;}}}catch(e){}S=fresh();S.lifeV=3;}
 function save(){if(window.__noSave)return;try{localStorage.setItem(KEY,JSON.stringify(realSave()));}catch(e){}try{famMark();}catch(e){}try{netBackup();}catch(e){}try{netMark();}catch(e){}}
 const byId=id=>S.rabbits.find(r=>r.id===id);
 const mainR=()=>S.mainId==null?null:byId(S.mainId)||null;
@@ -266,7 +268,7 @@ function pickName(extra){const u=new Set(S.rabbits.map(r=>r.name));if(extra)for(
 function newRabbit(o){
   const p=o.p||genPersona();
   return{id:S.nextId++,uid:rid(),ancU:[],name:o.name||pickName(),sex:o.sex||(Math.random()<.5?'m':'f'),g:o.g,born:o.born,stage:o.stage,gen:o.gen||1,mom:o.mom??null,dad:o.dad??null,temp:!!o.temp,
-    tr:{...p.tr},quirk:p.quirk,fav:p.fav,hate:p.hate,life:o.life||rand(31,35),
+    tr:{...p.tr},quirk:p.quirk,fav:p.fav,hate:p.hate,life:o.life||rand(41,47),l40:1,
     hunger:3,happy:3,disc:o.disc??0,weight:IDEAL[o.stage]??60,fiber:4,sugar:[],sick:null,tm:{h:0,p:0,poop:rand(0,40),f:0},calls:{},mt:0,mk:0,care:{pets:0,plays:0,snacks:0,wrong:0},
     shaped:o.stage==='adult'||o.stage==='elder',cold:0,lastPet:0,petN:0,mis:null,scared:0,zh:0,sm:0,fz:0,preg:null,nurse:0,partner:null,bond:0,seed:ri(1,999999),nestId:o.nestId??null,wasAsleep:false};
 }
@@ -330,7 +332,7 @@ function grow(r,to,t){
   const old=IDEAL[r.stage]||300;r.stage=to;r.weight=Math.max(Math.round(IDEAL[to]*.7),Math.round(IDEAL[to]+(r.weight-old)*.5));
   if(isMain(r)){
     let extra='';
-    if(to==='adult'&&!r.shaped){extra=shape(r);r.shaped=true;r.life=clamp(r.life+(r.mt<=3?3:r.mt<=8?0:-1),LIFE_MIN,LIFE_MAX);}
+    if(to==='adult'&&!r.shaped){extra=shape(r);r.shaped=true;r.life=clamp(r.life+(r.mt<=3?4:r.mt<=8?0:-1),LIFE_MIN,LIFE_MAX);}
     const m=`${r.name}长成${STAGE_N[to]}了！${extra}`;log(t,m);emit(m,'evolve');
     if(LIVE)FX.push({k:'sparkle',id:r.id,life:1.6});
   }else log(t,`${r.name}长成${STAGE_N[to]}了`);
@@ -344,7 +346,7 @@ function die(r,t,cause){
   else{const m=`${r.name}安详地回到月亮上了`;log(t,m);emit(m,'call');}
 }
 function stepAge(r,t){
-  const age=(t-r.born)/MIN;
+  lifeFix(r);const age=(t-r.born)/MIN;
   if(r.stage==='nest'&&age>=NEST_END){r.stage='kit';r.nestId=null;r.weight=IDEAL.kit;histOf(r);}
   else if(r.stage==='kit'&&age>=KIT_END)grow(r,'junior',t);
   else if(r.stage==='junior'&&age>=JUN_END)grow(r,'adult',t);
@@ -1018,7 +1020,7 @@ function drawRabbitAt(r,v){
   const sp=spriteOf(r,v);const y=v.y-Math.round(v.lift);
   if(v.act==='melt'){const m=Math.min(1,v.t/1.2),sx=1+.22*m,sy=1-.3*m,img=v.dir<0?sp.l:sp.r,ax=v.dir<0?sp.axl:sp.ax;bx.drawImage(img,Math.round(v.x-ax*sx),Math.round(y-sp.ay*sy),Math.round(sp.w*sx),Math.round(sp.h*sy));return;}
   drawSprite(sp,v.x,y,v.dir);
-  if((r.acc||r.myopia)&&r.stage!=='nest')drawWear(r.acc,r.myopia,v.pose,v.x,y,v.dir,stageOpts(r));
+  if((r.acc||r.myopia)&&r.stage!=='nest')drawWear(wearIds(r),r.myopia,v.pose,v.x,y,v.dir,stageOpts(r));
   if(!v.item)return;const o=stageOpts(r);const mx=v.x+v.dir*9.5*o.s,my=y-4*o.s;
   if(v.item==='bowl'||v.item==='pellet')bm('bowl',Math.round(v.x+v.dir*11*o.s)-4+(v.wig?v.dir:0),v.y-3);
   else if(v.item==='hay')bm('hay',Math.round(mx)-(v.dir<0?4:0),Math.round(my)-1);
@@ -1536,7 +1538,7 @@ function doMate(){
 }
 function genSuitors(m){
   const t=now(),taken=livingTitles(),names=[],L=[];
-  for(let i=0;i<3;i++){const p=uniquePersona(null,null,taken);taken.add(titleP(p));const nm=pickName(names);names.push(nm);L.push({g:rndGenome(),sex:m.sex==='m'?'f':'m',name:nm,p,days:ri(3,6)});}
+  for(let i=0;i<3;i++){const p=uniquePersona(null,null,taken);taken.add(titleP(p));const nm=pickName(names);names.push(nm);L.push({g:rndGenome(),sex:m.sex==='m'?'f':'m',name:nm,p,days:ri(9,13)});}
   S.suitors={at:t,sex:m.sex,list:L};
 }
 function suitorMenu(all){
@@ -1552,7 +1554,7 @@ function takeSuitor(i){
   const t=now(),m=mainR(),o=S.suitors.list.splice(i,1)[0];
   let nm=o.name;if(S.rabbits.some(r=>r.name===nm))nm=pickName();
   const born=t-o.days*1440*MIN;
-  const r=newRabbit({g:o.g,sex:o.sex,born,stage:o.days*1440>=ELDER_AT?'elder':'adult',p:o.p,name:nm,disc:60,life:rand(Math.max(31,o.days+8),35)});
+  const r=newRabbit({g:o.g,sex:o.sex,born,stage:o.days*1440>=ELDER_AT?'elder':'adult',p:o.p,name:nm,disc:60,life:rand(Math.max(41,o.days+11),47)});
   const isNew=!S.dex[phen(r.g).key];addHouse(r);
   m.partner=r.id;r.partner=m.id;m.bond=0;histOf(m);histOf(r);S.suitors=null;save();toMain();
   cap(`${r.name}搬进来了！它们要先培养感情${isNew?'（图鉴新增一种毛色）':''}`,5);sndOk();log(t,`${r.name}搬来和${m.name}一起住`);
@@ -1581,7 +1583,7 @@ function resetMenu(){
   const back=()=>setScreen(resetMenu());
   return menu('重置',[
     {t:'重新挑一只兔宝宝',s:'保留图鉴和家谱',h:'现在家里的兔子都会离开，再去邻居家重新挑一只',on:()=>setScreen(confirmScr('重新挑兔宝宝',`家里现在的${household().length}只兔子都会离开，然后重新挑一只兔宝宝。<br>图鉴、家谱、兔语和最高纪录会保留。`,()=>resetPet(),back))},
-    {t:'全部清空重来',s:'什么都不留',h:'兔子、家谱、图鉴、兔语、纪录全部清空',on:()=>setScreen(confirmScr('全部清空',`兔子、家谱、图鉴、兔语、最高纪录全部清空，无法恢复。`,()=>{const sh=S.shell;try{localStorage.removeItem(KEY);}catch(e){}S=fresh();S.lifeV=2;S.shell=sh;VIS.clear();FX.length=0;save();toMain();showStart();},back))}
+    {t:'全部清空重来',s:'什么都不留',h:'兔子、家谱、图鉴、兔语、纪录全部清空',on:()=>setScreen(confirmScr('全部清空',`兔子、家谱、图鉴、兔语、最高纪录全部清空，无法恢复。`,()=>{const sh=S.shell;try{localStorage.removeItem(KEY);}catch(e){}S=fresh();S.lifeV=3;S.shell=sh;VIS.clear();FX.length=0;save();toMain();showStart();},back))}
   ],()=>setScreen(bookMenu()));
 }
 function resetPet(){
@@ -1612,7 +1614,7 @@ function helpScreen(){
     `<p>兔子按<b>真实时间</b>生活，关掉页面它也在长大。</p><p>它需要什么，对应的图标就会<b>闪烁</b>，下面的文字也会告诉你怎么做。</p><p>红色的「呼叫」亮起表示它在叫你，15分钟内没处理就算一次照顾失误。</p>`,
     `<p><b>干草</b>是主食，要常喂，保护肠胃。<b>兔粮</b>很顶饱。</p><p><b>零食</b>让它开心，但2小时内吃4次会拉肚子。</p><p>每只兔子都有最爱和讨厌的零食，在「状态」里看得到。</p>`,
     `<p>每只兔子的性格都不一样：贪吃的饿得快、活泼的要常陪玩、黏人的爱被摸、胆小的夜里容易被吓醒、调皮的会捣蛋或假叫、爱记仇的被骂错会气很久。</p><p>它小时候你怎么照顾它，也会改变它长大后的性格。</p>`,
-    `<p>兔宝宝在毛窝里待12小时，出窝后是幼兔；3天后断奶、变少年兔，7天后成年，22天后变老，大约活30～38天。照顾得越好，活得越久。</p><p>它回到月亮上之后，你可以从家人里选一只继续养，或者领养新的兔宝宝。</p>`,
+    `<p>兔宝宝在毛窝里待16小时，出窝后是幼兔；4天后断奶、变少年兔，9天后成年，29天后变老，大约活40～51天。照顾得越好，活得越久。</p><p>它回到月亮上之后，你可以从家人里选一只继续养，或者领养新的兔宝宝。</p>`,
     `<p>成年后可以在「家族」里找对象。两只都醒着、你的兔子开心时，感情会慢慢变好，满了就能配对。</p><p>怀孕约24小时，生下2～5只宝宝。毛色、耳朵、性格都会遗传。家里最多住8只。</p>`,
     `<p>要出门或睡觉前，可以在「家族」里请邻居照顾，最多10小时。这段时间不会算照顾失误。</p>`,
     `<p>「家族 → 朋友联机」可以和朋友互传兔子码：串门码让你的兔子去朋友家玩3小时、礼物码送礼、宝宝码送养兔子。</p><p>客人兔成年的话可以和你的兔子相亲。母兔那一方会生下宝宝，宝宝带着两家的血统。每个码只能用一次。</p>`,
@@ -2294,6 +2296,7 @@ function surpriseCheck(){if(BIRTH||(typeof birthNest==="function"&&mode==="main"
   if(mode!=='main'||document.hidden||!S.started||SPEC||DREAM||homeAway())return;
   const r=mainR();if(!r||r.stage==='nest'||S.tut>=1&&S.tut<=5)return;
   if(performance.now()<capUntil||selIcon>=0)return;
+  if(devGiftCheck())return;
   const t=now(),asleep=isAsleep(r,t),v=vis(r),today=dayKey(t),tr=affTier(r);
   S.sup=S.sup||{last:{}};
   // queued news first
@@ -2510,7 +2513,7 @@ function startWalk(r,id){
       SCENES[id].draw(this.off,this.t,h);
       for(const e of this.evs){if(e.st==='gone'&&e.k!=='puddle')continue;const x=Math.round(e.wx-this.off);if(x<-20||x>110)continue;this.drawEvt(e,x);}
       const v=this.rs,o=stageOpts(r);const sp=rabbitSprite(r.g,r.seed,v.pose,v.pose==='sit'&&(this.t%3)>2.85?'closed':'open',o);
-      {const yy=(id==='river'?56:56)+3-Math.round(v.lift)-3+3;drawSprite(sp,v.x,yy,v.dir);drawWear(r.acc,r.myopia,v.pose,v.x,yy,v.dir,o);}
+      {const yy=(id==='river'?56:56)+3-Math.round(v.lift)-3+3;drawSprite(sp,v.x,yy,v.dir);drawWear(wearIds(r),r.myopia,v.pose,v.x,yy,v.dir,o);}
       if(night){rect(0,0,W,H,'rgba(20,24,44,.42)');for(const[lx,ly,small]of W_LIGHTS){bx.fillStyle='rgba(245,211,90,.35)';bx.fillRect(lx-(small?1:3),ly-(small?1:1),small?3:7,small?3:12);bx.fillStyle='#f5d35a';bx.fillRect(lx,ly,1,1);}}
       if(this.cur&&this.cur.st==='wait'){const k=this.cur.k,x=Math.round(EVT[k].sky?24:this.cur.wx-this.off),y=EVT[k].sky?24:EVT[k].air?14:30,bob=Math.floor(this.t*3)%2;rect(x-3,y-1+bob,7,9,'#f6f3ea');rect(x-2,y-2+bob,5,11,'#f6f3ea');rect(x,y+bob,1,4,INK);rect(x,y+6+bob,1,1,INK);rect(x-1,y+9+bob,2,1,'#f6f3ea');}
       const pct=Math.min(1,this.off/this.end);rect(1,0,32,5,'#f6f3ea');rect(2,1,30,3,INK);rect(3,2,Math.round(28*pct),1,'#f5d35a');
@@ -3182,7 +3185,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="300" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.08a';
+const GAME_VER='2026.11.10a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3512,7 +3515,7 @@ async function recoverByCode(raw){
   const main=L.find(e=>e.s&&e.s.mn)||L[0];const names=L.map(e=>e.p.nm).join('、');
   setScreen(confirmScr('找回兔子',`找到了：<b>${esc(names)}</b><br>（${esc(String(pl.nick||'兔主人'))}，${new Date(pl.at).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})} 的记录）<br>要把它们带回来吗？`,()=>{
     const keepNet=S.net,nick=S.nick||pl.nick||'';const t=now();const passed=Math.max(0,(Date.now()-(pl.at||Date.now()))/MIN);
-    S=fresh();S.lifeV=2;S.net=keepNet;S.nick=nick;S.started=true;S.tut=-1;S.firstPlay=Date.now();
+    S=fresh();S.lifeV=3;S.net=keepNet;S.nick=nick;S.started=true;S.tut=-1;S.firstPlay=Date.now();
     let mr=null;
     for(const e of L){const p=unpackR(e.p);const ageMin=p.age+passed;
       const r=newRabbit({g:p.g,sex:p.sex,born:t-ageMin*MIN,stage:(e.s&&e.s.st)||p.stage,p:p.p,name:p.name,gen:p.gen,disc:60});
@@ -3600,7 +3603,7 @@ function webInit(){
 }
 
 /* ================= 实时联机玩法：抢胡萝卜 · 兔子公园 · 住宿报告 · 每日礼物 ================= */
-const miniP=r=>({u:r.uid,nm:r.name,g:gStr(r.g),sd:r.seed,sx:r.sex,st:r.stage,ac:r.acc||null,my:r.myopia?1:0,out:r.out||null});
+const miniP=r=>({u:r.uid,nm:r.name,g:gStr(r.g),sd:r.seed,sx:r.sex,st:r.stage,ac:wearStr(r),my:r.myopia?1:0,out:r.out||null});
 const fakeMini=p=>({uid:p.u,name:p.nm,g:strG(p.g),seed:p.sd,sex:p.sx,stage:p.st,tr:{brave:50,active:50,cuddly:50,greedy:50,naughty:50,temper:50}});
 function friendNick(fu){return(netS().friends[fu]||{}).nick||'朋友';}
 function mpBlock(){const m=mainR(),t=now();if(!m||m.stage==='nest')return'现在没有兔子';if(!netOn())return'没有连上服务器';if(awayR(m))return`${m.name}不在家`;if(isAsleep(m,t))return`${m.name}在睡觉`;if(m.sick)return`${m.name}生病了`;return null;}
@@ -3707,7 +3710,7 @@ function parkScreen(){
       const hop=(k,mv)=>mv?((this.t*2.6+k)%1<.65?'hop':'sit'):'sit';
       for(const[fu,o]of this.live()){const r=fakeMini(o.r);const mv=Math.abs(o.x-o.dx)>1||o.act==='walk';const bk=o.act==='binky';
         const sp=rabbitSprite(r.g,r.seed,bk?'hop':hop(.3,mv),'open',stageOpts({stage:r.stage,out:o.r.out}));const yy=61-(bk?Math.round(Math.sin((this.t*3)%1*Math.PI)*6):0),dd=o.x<o.dx?-1:1;drawSprite(sp,Math.round(o.dx),yy,dd);drawWear(o.r.ac,o.r.my,bk?'hop':hop(.3,mv),Math.round(o.dx),yy,dd,stageOpts({stage:r.stage}));}
-      const mv=this.act==='walk',bk=this.at2!=null;const sp=rabbitSprite(m.g,m.seed,bk?'hop':hop(0,mv),'open',stageOpts(m));{const yy=61-(bk?Math.round(Math.sin(Math.min(1,this.at2/.9)*Math.PI)*8):0),dd=this.tx<this.x?-1:1;drawSprite(sp,Math.round(this.x),yy,dd);drawWear(m.acc,m.myopia,bk?'hop':hop(0,mv),Math.round(this.x),yy,dd,stageOpts(m));}
+      const mv=this.act==='walk',bk=this.at2!=null;const sp=rabbitSprite(m.g,m.seed,bk?'hop':hop(0,mv),'open',stageOpts(m));{const yy=61-(bk?Math.round(Math.sin(Math.min(1,this.at2/.9)*Math.PI)*8):0),dd=this.tx<this.x?-1:1;drawSprite(sp,Math.round(this.x),yy,dd);drawWear(wearIds(m),m.myopia,bk?'hop':hop(0,mv),Math.round(this.x),yy,dd,stageOpts(m));}
       bm('arrow',Math.round(this.x)-2,26);
       for(const f of fx){if(f.k==='hearts'){for(let i=0;i<3;i++)bm('heart',Math.round(f.x-6+i*5),Math.round(40-f.t*10-i*2),'#d9485a');}
         else if(f.k==='carrot'){const p=Math.min(1,f.t/.8);const x=f.x0+(f.x1-f.x0)*p,y=46-Math.sin(p*Math.PI)*18;if(p<1)bm('carrot',Math.round(x)-3,Math.round(y));}}
@@ -3871,7 +3874,12 @@ const SHOP=[
  {id:'starpin',n:'星星发夹',k:'acc',p:45,d:'亮晶晶的小星星',dig:'star'},
  {id:'w_moon',n:'月亮夜灯',k:'wall',p:50,d:'关灯以后会发出柔和的光',dig:'star'},
  {id:'f_telescope',n:'小望远镜',k:'furn',p:70,d:'它会站着往里看',dig:'star'},
- {id:'o_galaxy',n:'星空披风',k:'outfit',p:100,d:'深蓝夜空，缀满星星',dig:'star'}];
+ {id:'o_galaxy',n:'星空披风',k:'outfit',p:100,d:'深蓝夜空，缀满星星',dig:'star'},
+ // 开发者赠送（2026.11.10a）：小店不卖
+ {id:'tophat',n:'绅士礼帽',k:'acc',p:60,d:'黑色高礼帽，系着酒红色缎带',ev:1},
+ {id:'monocle',n:'金框单片眼镜',k:'acc',p:60,d:'金色细框，挂着一条小金链',ev:1},
+ {id:'ladyhat',n:'贵妇宽檐帽',k:'acc',p:60,d:'宽宽的帽檐，别着玫瑰和白羽毛',ev:1},
+ {id:'pearls',n:'珍珠项链',k:'acc',p:60,d:'一圈圆润的白珍珠',ev:1}];
 // 装扮花纹：x,y 是兔子图像里的像素位置，belly 是肚子
 const OUTFIT={
  o_sweater:{col:(x,y,b)=>b?'#e8707e':(y%2?'#d9485a':'#c23c4d')},
@@ -3900,6 +3908,16 @@ const OUTFIT={
  o_snowknit:{col:(x,y,b)=>((x%4===1&&y%4===1)||(x%4===0&&y%4===2)||(x%4===2&&y%4===2))?'#ffffff':(b?'#6b8fbf':'#4f6fa8')},
  o_galaxy:{col:(x,y,b)=>(x*13+y*7)%17===0?'#f5d35a':(x*5+y*11)%23===0?'#ffffff':(b?'#3a4478':'#2b3355')}};
 const SHOPI=Object.fromEntries(SHOP.map(x=>[x.id,x]));
+// 饰品两格（2026.11.10a）：a 格＝帽子、发饰；b 格＝眼镜、项链、围巾这类。一格一样，两格可以一起戴。
+// 只戴一样时放在 r.acc（和旧版、还没更新的朋友相容），两样都戴时 a 格在 r.acc、b 格在 r.acc2。
+const ACC_B=new Set(['glasses','sunglasses','monocle','scarf','bell','tie','pearls']),EYEWEAR=new Set(['glasses','sunglasses','monocle']);
+const accSlot=id=>ACC_B.has(id)?'b':'a';
+function wearIds(r){const L=[];if(r)for(const x of[r.acc,r.acc2])if(x&&!L.includes(x))L.push(x);return L;}
+function setWear(r,L){const a=L.find(x=>accSlot(x)==='a'),b=L.find(x=>accSlot(x)==='b');r.acc=a||b||null;r.acc2=a&&b?b:null;}
+function wearOn(r,id){setWear(r,[...wearIds(r).filter(x=>accSlot(x)!==accSlot(id)),id]);}
+function wearOff(r,id){setWear(r,wearIds(r).filter(x=>x!==id));}
+const wears=(r,id)=>wearIds(r).includes(id);
+const wearStr=r=>wearIds(r).join('|')||null;
 Object.assign(BM,{
   sh_berry:['.g.','rrr','rrr','.r.'],sh_cookie:['.yyy.','yfyfy','yyyyy','.yyy.'],
   ac_bow:['rr.rr','rrrrr','rr.rr'],ac_hat:['..yyy..','.yyyyy.','yyrrryy'],ac_scarf:['bbbbbb','..bb..','..b...'],ac_crown:['q.d.q','qqqqq'],
@@ -3908,7 +3926,12 @@ Object.assign(BM,{
   sh_apple:['.g.','rwr','rwr','.r.'],sh_dandelion:['g.g','ggg','.g.'],sh_banana:['..y','.yy','yy.'],sh_cake:['.r.','www','ccc','ccc'],sh_energy:['ggg','zzz','ggg'],sh_vitamin:['.rr.','rrww','.ww.'],
   note:['wwwww','wkkkw','wwwww','wkkww','wwwww'],
   ac_sakura:['.C.','CAC','.C.'],ac_shell:['.E.','EEE','EfE'],ac_starfish:['..N..','NNNNN','.N.N.'],ac_leaf:['..H..','.HHH.','HHHHH','..m..'],
-  ac_earmuff:['.LLLLL.','C.....C','CC...CC'],ac_starpin:['.Y.','YIY','.Y.']
+  ac_earmuff:['.LLLLL.','C.....C','CC...CC'],ac_starpin:['.Y.','YIY','.Y.'],
+  // 开发者赠送（2026.11.10a）。有方向的（单片眼镜、宽檐帽）另外有朝左的一张 *L
+  ac_tophat:['.ooooo.','.oxooo.','.oxooo.','.rrrrr.','ooooooo'],
+  ac_ladyhat:['.......w.','..uuuuww.','..qqqrr..','uuuuuuuuu','u.......u'],
+  ac_monocle:['.zzz','.z.z','.zzz','z...','z...'],
+  ac_pearls:['I...I','xI.Ix','.IxI.','..z..']
 });
 Object.assign(BMC,{A:'#f7d3da',C:'#eba3b4',E:'#f0e2c8',H:'#c8502a',I:'#ffffff',L:'#8a6fb0',N:'#e8833a'});
 function shopMenu(){
@@ -3928,7 +3951,7 @@ function shopMenu(){
 }
 const owned=id=>{S.inv=S.inv||{};return S.inv[id]||0;};
 function shopList(k){
-  const back=()=>setScreen(shopMenu());const L0=()=>SHOP.filter(x=>x.k===k&&!x.dig);
+  const back=()=>setScreen(shopMenu());const L0=()=>SHOP.filter(x=>x.k===k&&!x.dig&&!x.ev);
   const M0=menu({snack:'零食',furn:'家具・玩具',acc:'饰品',sport:'运动用品',outfit:'装扮',wall:'墙饰'}[k],()=>L0().map((x,i)=>{const have=owned(x.id);const fav=k==='furn'&&mainR()&&favToy(mainR())===x.id;
     return{t:x.n+(fav?' ♥':''),s:`🥕${x.p}${have?` · 有${have}个`:''}`,h:(fav?`${mainR().name}最喜欢这个！ `:'')+x.d+'\n按 B 先看看',
       on:()=>setScreen(previewScreen(L0().map(y=>y.id),i,()=>{const s2=shopList(k);s2.idx=i;setScreen(s2);}))};}),back,`🥕${S.coins||0}`);
@@ -3942,7 +3965,7 @@ function buy(x){
   if(x.k==='furn'){S.furn=S.furn||[];if(S.furn.length<FURN_X.length){placeFurn(x.id);save();toMain();cap(`买了「${x.n}」，已经摆进兔舍了！`,4);return;}save();setScreen(myStuffMenu());cap(`买了「${x.n}」！兔舍只放得下${FURN_X.length}件，去「我的东西」换一下`,5);return;}
   if(x.k==='sport'){save();setScreen(shopList('sport'));cap(`买了「${x.n}」，在「我的东西」或训练菜单里使用`,4);return;}
   if(x.k==='outfit'){const m=mainR();if(m)m.out=x.id;save();toMain();cap(`买了「${x.n}」，${m?m.name+'已经穿上了':''}！到「小店 → 衣柜」可以换或脱下`,5);sndCute();if(m)firstTime(m,'outfit',`${m.name}穿上了${x.n}`,1);return;}
-  if(x.k==='acc'){const m=mainR();if(m){m.acc=x.id;}save();toMain();cap(`买了「${x.n}」，${m?m.name+'已经戴上了':''}！`,4);sndCute();return;}
+  if(x.k==='acc'){const m=mainR();if(m){wearOn(m,x.id);}save();toMain();cap(`买了「${x.n}」，${m?m.name+'已经戴上了':''}！`,4);sndCute();return;}
   save();setScreen(shopList(x.k));cap(`买了「${x.n}」，喂食的时候可以用`,4);
 }
 const FURN_X=[26,45,104,122,140];
@@ -3953,8 +3976,8 @@ function wardrobeMenu(back){const m=mainR();
     const outs=SHOP.filter(x=>x.k==='outfit'&&owned(x.id)),accs=SHOP.filter(x=>x.k==='acc'&&owned(x.id));
     L.push({t:'不穿衣服',s:m.out?'':'现在',h:'把衣服脱下来',on:()=>{if(!m.out)return;const was=SHOPI[m.out];m.out=null;save();sndClick();cap(`${m.name}把${was.n}脱下来了`,3);renderUI();}});
     for(const x of outs)L.push({t:x.n,s:m.out===x.id?'穿着':'装扮',h:m.out===x.id?'按 B 脱下':'按 B 换上',on:()=>{m.out=m.out===x.id?null:x.id;save();sndClick();cap(m.out?`${m.name}换上了${x.n}`:`${m.name}把${x.n}脱下来了`,3);renderUI();}});
-    L.push({t:'不戴饰品',s:m.acc?'':'现在',h:'把头上的饰品拿下来',on:()=>{if(!m.acc)return;const was=SHOPI[m.acc];m.acc=null;save();sndClick();cap(`${m.name}把${was?was.n:'饰品'}拿下来了`,3);renderUI();}});
-    for(const x of accs)L.push({t:x.n,s:m.acc===x.id?'戴着':'饰品',h:m.acc===x.id?'按 B 拿下来':'按 B 戴上',on:()=>{m.acc=m.acc===x.id?null:x.id;save();sndClick();cap(m.acc?`${m.name}戴上了${x.n}`:`${m.name}把${x.n}拿下来了`,3);renderUI();}});
+    L.push({t:'不戴饰品',s:m.acc?'':'现在',h:'把身上的饰品全部拿下来',on:()=>{const W=wearIds(m);if(!W.length)return;setWear(m,[]);save();sndClick();cap(`${m.name}把${W.map(id=>SHOPI[id]?SHOPI[id].n:'饰品').join('和')}拿下来了`,3);renderUI();}});
+    for(const x of accs)L.push({t:x.n,s:wears(m,x.id)?'戴着':accSlot(x.id)==='b'?'眼镜・项链':'帽子・发饰',h:wears(m,x.id)?'按 B 拿下来':accSlot(x.id)==='b'?'按 B 戴上（可以和帽子、发饰一起戴）':'按 B 戴上（可以和眼镜、项链一起戴）',on:()=>{const on=!wears(m,x.id);if(on)wearOn(m,x.id);else wearOff(m,x.id);save();sndClick();cap(on?`${m.name}戴上了${x.n}`:`${m.name}把${x.n}拿下来了`,3);renderUI();}});
     if(!outs.length&&!accs.length)L.push({t:'衣柜还是空的',dis:'去小店买装扮或饰品吧',on:()=>{}});
     return L;},back||null,'按 B 换上／脱下');}
 function myStuffMenu(){
@@ -4094,7 +4117,7 @@ function digScreen(r,pid,cells,sniff){
       const[tx]=digCellXY(this.sel);const want=this.anim?this.rx:tx+5-this.dir*8;if(!this.anim){const d=want-this.rx;if(Math.abs(d)>.5){this.dir=d>0?1:-1;this.rx+=Math.sign(d)*Math.min(Math.abs(d),40/60);}}
       this.rx=clamp(this.rx,8,88);const moving=!this.anim&&Math.abs(want-this.rx)>.5;
       const pose=this.anim?(Math.floor(this.anim.t/.12)%2?'eat':'loaf'):this.ended&&this.res&&this.res.items.length?(Math.floor(tt*3)%2?'hop':'sit'):moving?(Math.floor(tt*6)%2?'hop':'sit'):'sit';
-      const o=stageOpts(r);const sp=rabbitSprite(r.g,r.seed,pose,'open',o);const ry=43-(moving&&pose==='hop'?2:0);drawSprite(sp,this.rx,ry,this.dir);drawWear(r.acc,r.myopia,pose,this.rx,ry,this.dir,o);
+      const o=stageOpts(r);const sp=rabbitSprite(r.g,r.seed,pose,'open',o);const ry=43-(moving&&pose==='hop'?2:0);drawSprite(sp,this.rx,ry,this.dir);drawWear(wearIds(r),r.myopia,pose,this.rx,ry,this.dir,o);
       for(const f of FX){if(f.k==='dust'){bx.fillStyle=P.mound;bx.fillRect(Math.round(f.x),Math.round(f.y),1,1);}}
       if(this.pop&&this.pop.t<1.4){const[cx,cy]=digCellXY(this.pop.i);const up=Math.min(1,this.pop.t/.5)*10;const x=cx+5,y=Math.round(cy+2-up);
         for(let k=0;k<4;k++){const a=this.pop.t*5+k*Math.PI/2;bm('star',Math.round(x+Math.cos(a)*8)-1,Math.round(y+Math.sin(a)*5)-1);}
@@ -4163,7 +4186,7 @@ function drawPreview(x,t){
   // 家具、墙饰：特写和「摆在兔舍里」两个画面轮流
   if((k==='furn'||k==='wall')&&Math.floor(t/3)%2===1){drawRoom();drawWindow(WIN.x,WIN.y);
     if(k==='wall')drawWallItem(x.id,44,7);else{bx.save();bx.translate(0,FURN_Y-61);drawFurn('back',[{id:x.id,x:45}]);bx.restore();}
-    if(r){const o=stageOpts(r);const sp=rabbitSprite(r.g,r.seed,'sit','open',o);drawSprite(sp,72,56,-1);drawWear(r.acc,r.myopia,'sit',72,56,-1,o);}
+    if(r){const o=stageOpts(r);const sp=rabbitSprite(r.g,r.seed,'sit','open',o);drawSprite(sp,72,56,-1);drawWear(wearIds(r),r.myopia,'sit',72,56,-1,o);}
     if(k==='furn'&&x.id==='tunnel'){bx.save();bx.translate(0,FURN_Y-61);drawFurn('front',[{id:x.id,x:45}]);bx.restore();}
     return;}
   // 试衣间：浅紫墙、帘子、聚光灯
@@ -4179,11 +4202,11 @@ function drawPreview(x,t){
   const o=stageOpts(r),o2=Object.assign({},o,{s:1,hb:1,ef:1});const cyc=Math.floor(t/1.6)%4;const P=['sit','stand','hop','loaf'][cyc];const dir=Math.floor(t/3.2)%2?-1:1;
   let pose=P,lift=0;if(P==='hop'){const p=(t%1.6)/.8%1;lift=Math.round(Math.sin(Math.PI*p)*3);pose=lift>0?'hop':'sit';}
   const blink=(t%2.4)>2.25?'closed':'open';
-  if(k==='outfit'||k==='acc'){const out=k==='outfit'?x.id:r.out||null,acc=k==='acc'?x.id:r.acc;const oo=Object.assign({},o2,{out});
+  if(k==='outfit'||k==='acc'){const out=k==='outfit'?x.id:r.out||null,acc=k==='acc'?(()=>{const t={acc:r.acc,acc2:r.acc2};wearOn(t,x.id);return wearIds(t);})():wearIds(r);const oo=Object.assign({},o2,{out});
     const sp=rabbitSprite(r.g,r.seed,pose,blink,oo);big(()=>{drawSprite(sp,0,-lift,dir);drawWear(acc,r.myopia,pose,0,-lift,dir,oo);},48,60);
     if(Math.floor(t*3)%4===0)bm('star',72,14);if(Math.floor(t*3+2)%4===0)bm('star',20,22);return;}
-  if(k==='snack'){const ep=Math.floor(t/.25)%2?'eat':'sit';const sp=rabbitSprite(r.g,r.seed,ep,'open',o2);big(()=>{drawSprite(sp,-4,0,1);drawWear(r.acc,r.myopia,ep,-4,0,1,o2);const b=BM['sh_'+x.id];if(b)bm('sh_'+x.id,5,-5);},44,60);return;}
-  const sp=rabbitSprite(r.g,r.seed,'stand','open',o2);big(()=>{drawSprite(sp,0,0,1);drawWear(r.acc,r.myopia,'stand',0,0,1,o2);},34,60);const b=BM['sh_'+x.id];if(b)big(()=>bm('sh_'+x.id,0,0),66,26-Math.round(Math.sin(t*3)*2));
+  if(k==='snack'){const ep=Math.floor(t/.25)%2?'eat':'sit';const sp=rabbitSprite(r.g,r.seed,ep,'open',o2);big(()=>{drawSprite(sp,-4,0,1);drawWear(wearIds(r),r.myopia,ep,-4,0,1,o2);const b=BM['sh_'+x.id];if(b)bm('sh_'+x.id,5,-5);},44,60);return;}
+  const sp=rabbitSprite(r.g,r.seed,'stand','open',o2);big(()=>{drawSprite(sp,0,0,1);drawWear(wearIds(r),r.myopia,'stand',0,0,1,o2);},34,60);const b=BM['sh_'+x.id];if(b)big(()=>bm('sh_'+x.id,0,0),66,26-Math.round(Math.sin(t*3)*2));
 }
 function buyBlock(x){if((S.coins||0)<x.p)return`胡萝卜币不够（还差${x.p-(S.coins||0)}）`;return null;}
 
@@ -4200,7 +4223,7 @@ function giftToMenu(id,back){const x=SHOPI[id];
     L.push({t:'用兔子码送',s:'复制给朋友',h:'没有加好友也能送：把礼物码发给朋友，他贴进游戏就收到',on:()=>setScreen(confirmScr('送礼物',`把「${esc(x.n)}」做成礼物码？<br>做好以后你这边就少一件`,()=>giftSend(id,null,back),()=>setScreen(giftToMenu(id,back))))});
     return L;},back,x.n);}
 function takeItem(id){S.inv[id]=Math.max(0,(S.inv[id]||0)-1);if(S.inv[id]>0)return;
-  for(const r of S.rabbits){if(r.out===id)r.out=null;if(r.acc===id)r.acc=null;}
+  for(const r of S.rabbits){if(r.out===id)r.out=null;if(wears(r,id))wearOff(r,id);}
   S.furn=(S.furn||[]).filter(f=>f.id!==id);S.wall=(S.wall||[]).filter(f=>f.id!==id);}
 function giftSend(id,fu,back){const x=SHOPI[id];if(!owned(id)){cap('已经没有了',3);sndNo();return;}
   const code=mkCode({t:'item',iid:id});takeItem(id);save();
@@ -4216,7 +4239,7 @@ function recvItem(c){const x=SHOPI[c.iid];const from=String(c.n||'朋友').slice
 function giftGotScreen(x,from){const m=mainR();const verb={outfit:'穿上',acc:'戴上',wall:'挂上墙',furn:'摆进兔舍',snack:'喂它吃'}[x.k];
   const g=previewScreen([x.id],0,()=>toMain(),{view:1});
   g.hint=function(){return`${from}送你「${x.n}」！\n${x.d}\nB ${verb} · C 先收起来`;};
-  g.B=function(){sndOk();if(x.k==='outfit'&&m){m.out=x.id;}else if(x.k==='acc'&&m){m.acc=x.id;}else if(x.k==='wall'){if(!(S.wall||[]).some(f=>f.id===x.id)&&!placeWall(x.id)){cap('墙上挂满了，去「我的东西」换一下',4);}}else if(x.k==='furn'){if(!(S.furn||[]).some(f=>f.id===x.id)&&!placeFurn(x.id))cap(`兔舍只放得下${FURN_X.length}件，去「我的东西」换一下`,4);}else if(x.k==='snack'&&m){save();useSnack(m,x.id);return;}
+  g.B=function(){sndOk();if(x.k==='outfit'&&m){m.out=x.id;}else if(x.k==='acc'&&m){wearOn(m,x.id);}else if(x.k==='wall'){if(!(S.wall||[]).some(f=>f.id===x.id)&&!placeWall(x.id)){cap('墙上挂满了，去「我的东西」换一下',4);}}else if(x.k==='furn'){if(!(S.furn||[]).some(f=>f.id===x.id)&&!placeFurn(x.id))cap(`兔舍只放得下${FURN_X.length}件，去「我的东西」换一下`,4);}else if(x.k==='snack'&&m){save();useSnack(m,x.id);return;}
     save();toMain();cap(`${m&&(x.k==='outfit'||x.k==='acc')?m.name:''}${verb}了「${x.n}」`,4);};
   g.C=function(){sndClick();toMain();cap(`「${x.n}」收进「我的东西」了`,3);};
   return g;}
@@ -4322,18 +4345,61 @@ function furnScript(r){
 }
 /* ---------- 饰品（画在兔子头上） ---------- */
 const ACC_COL={};
+for(const k of['ac_ladyhat','ac_monocle'])BM[k+'L']=BM[k].map(r=>[...r].reverse().join(''));
+const MON_DX=[0,0],MON_DY=0;
 function drawAcc(id,pose,x,y,dir,o){
-  if(!id)return;const sp=poseSpec(pose,o.preg);if(!sp)return;if(sp.back&&(id==='glasses'||id==='sunglasses'||id==='specs'))return;
+  if(!id)return;const sp=poseSpec(pose,o.preg);if(!sp)return;if(sp.back&&(id==='glasses'||id==='sunglasses'||id==='specs'||id==='monocle'||id==='pearls'))return;
   const[hx,hy,hrx,hry]=sp.H;const hb=o.hb||1,s=o.s||1;const Hc=hy+hry-hry*hb,HR=hry*hb,WR=hrx*hb;
   const SX=X=>Math.round(x+dir*(X-9)*s),SY=Y=>Math.round(y+(Y-16.4)*s);const b=BM['ac_'+id];if(!b)return;const w=b[0].length,h=b.length;
   let px,py;
   const AP={starfish:'top',leaf:'top',earmuff:'top',sakura:'ear',shell:'ear',starpin:'ear'}[id];
-  if(AP==='top'||id==='hat'||id==='crown'||id==='raincoat'||id==='cap'||id==='headband'){px=SX(hx-WR*.1)-Math.floor(w/2);py=SY(Hc-HR)-h+1+(id==='crown'?1:0);}
+  if(AP==='top'||id==='hat'||id==='tophat'||id==='ladyhat'||id==='crown'||id==='raincoat'||id==='cap'||id==='headband'){px=SX(hx-WR*.1)-Math.floor(w/2);py=SY(Hc-HR)-h+1+(id==='crown'?1:0);}
   else if(AP==='ear'||id==='bow'||id==='flowerpin'){px=SX(hx-WR*.55)-Math.floor(w/2);py=SY(Hc-HR*.8)-1;}
   else if(id==='glasses'||id==='sunglasses'||id==='specs'){if(sp.back)return;px=SX(hx+WR*.4)-Math.floor(w/2);py=SY(Hc-HR*.12);}
+  else if(id==='monocle'){if(sp.back)return;const ex=Math.floor(x+dir*(hx+WR*.4-9)*s),ey=Math.floor(y+(Hc-HR*.12-16.4)*s);px=dir<0?ex-1+MON_DX[1]:ex-2+MON_DX[0];py=ey-1+MON_DY;bm(dir<0?'ac_monocleL':'ac_monocle',px,py);return;}
   else{px=SX(hx-WR*.6)-Math.floor(w/2);py=SY(Hc+HR*.8);}
-  bm('ac_'+id,px,py);
+  bm('ac_'+id+(id==='ladyhat'&&dir<0?'L':''),px,py);
 }
+
+/* ---------- 开发者赠送（2026.11.10a 起）：全体玩家一次，每只兔子按公母各得一套 ---------- */
+const DEV_GIFTS=[{id:'g1110',from:Date.parse('2026-11-10T00:00:00+08:00'),m:['tophat','monocle'],f:['ladyhat','pearls']}];
+function devGiftCheck(){
+  if(famView()||famMirror()||SIMQ)return false;const t=now();S.devG=S.devG||{};
+  for(const G of DEV_GIFTS){if(S.devG[G.id]||t<G.from)continue;
+    const rs=household().filter(r=>r.stage!=='nest');if(!rs.length)return false;
+    S.devG[G.id]=1;S.inv=S.inv||{};
+    for(const r of rs)for(const id of(r.sex==='m'?G.m:G.f))S.inv[id]=(S.inv[id]||0)+1;
+    log(t,`收到开发者赠送的礼物：${rs.map(r=>r.name).join('、')}各有一份`);save();
+    setScreen(devGiftScreen(G,rs));sndCute();return true;}
+  return false;}
+function devGiftScreen(G,rs){
+  const main=mainR();const pickSex=sx=>rs.find(r=>r===main&&r.sex===sx)||rs.find(r=>r.sex===sx&&!awayR(r))||rs.find(r=>r.sex===sx);
+  const show=[pickSex('m'),pickSex('f')].filter(Boolean);
+  const nm=ids=>ids.map(id=>SHOPI[id].n).join('＋');
+  const hasM=rs.some(r=>r.sex==='m'),hasF=rs.some(r=>r.sex==='f');
+  // 提示只有三行：公兔、母兔都有时，第二行每 3 秒轮流介绍，画面上用小箭头指着正在介绍的那只
+  const both=show.length>1;
+  return{name:'devgift',t:0,ph:0,
+    hint(){const sx=both?(this.ph?'f':'m'):show[0].sex;return`🎁 开发者赠送！每只兔子都有一份\n${sx==='m'?`公兔子：${nm(G.m)}`:`母兔子：${nm(G.f)}`}\nB 全部戴上 · C 先收进衣柜`;},
+    A(){},tap(){},
+    B(){sndOk();for(const r of rs)for(const id of(r.sex==='m'?G.m:G.f))wearOn(r,id);save();toMain();
+      cap(`开发者赠送的礼物都戴上了！\n想换下来，去「小店 → 衣柜」`,5);},
+    C(){sndClick();toMain();cap(`礼物收进衣柜了\n去「小店 → 衣柜」就能戴上`,5);},
+    upd(dt){this.t+=dt;if(both){const ph=Math.floor(this.t/3)%2;if(ph!==this.ph){this.ph=ph;renderStrip();}}},
+    draw(){const t=this.t;bx.imageSmoothingEnabled=false;
+      // 背景：暖色墙、彩带、地板
+      rect(0,0,W,H,'#f3e6d3');for(let i=3;i<W;i+=9)rect(i,0,1,44,'#ead9c2');
+      for(let i=0;i<W;i+=6){rect(i,2+(i/6%2),4,2,['#d9485a','#e3b341','#7d9fc0','#8a6fb0'][i/6%4]);}
+      rect(0,44,W,20,'#d4c39c');rect(0,44,W,1,INK);for(const y of[48,53,59])rect(0,y,W,1,'#bfa97f');
+      bx.fillStyle='rgba(255,250,220,.5)';for(let j=0;j<8;j++){const w=16+j*3;bx.fillRect(48-w,46+j*2,w*2,2);}
+      const big=(fn,cx,base)=>{bx.save();bx.translate(cx,base);bx.scale(2,2);fn();bx.restore();};
+      const xs=show.length>1?[26,70]:[48];
+      show.forEach((r,i)=>{const o=Object.assign({},stageOpts(r));const set=r.sex==='m'?G.m:G.f;
+        const p=(t+i*.8)%3<.5?'hop':'sit';const lift=p==='hop'?Math.round(Math.sin(((t+i*.8)%3)/.5*Math.PI)*3):0;
+        const blink=((t+i)%2.6)>2.45?'closed':'open';const dir=i===0&&show.length>1?1:-1;
+        const sp=rabbitSprite(r.g,r.seed,p,blink,o);big(()=>{drawSprite(sp,0,-lift,dir);drawWear(set,r.myopia,p,0,-lift,dir,o);},xs[i],60);});
+      if(Math.floor(t*3)%4===0)bm('star',8,16);if(Math.floor(t*3+2)%4===0)bm('star',84,22);if(Math.floor(t*3+1)%4===0)bm('star',47,10);
+      if(both){const ax=xs[this.ph]-2,ay=7+(Math.floor(t*2.5)%2);bmP(['ooooo','.ooo.','..o..'],ax,ay,{o:'#d9485a'});}}};}
 /* ---------- 天气 ---------- */
 const WX_N={sun:'晴天',cloud:'阴天',rain:'下雨',thunder:'雷雨',fog:'起雾',rainbow:'彩虹',night:'夜晚'};
 function wxBlock(t){const d=new Date(t);const day=Math.floor((t+8*3600000)/86400000);const blk=Math.floor(d.getHours()/2);const hh=d.getHours();
@@ -4358,7 +4424,7 @@ function drawWeatherPen(){
   const b=WXBM[w==='sun'&&(hourOf(now())<6||hourOf(now())>=19)?'cloud':w];if(b){bx.fillStyle=S.light?'rgba(205,213,181,.92)':'rgba(30,34,48,.85)';bx.fillRect(0,0,b[0].length+4,b.length+2);bm('wx_'+w,2,1);}
 }
 for(const k of Object.keys(WXBM))BM['wx_'+k]=WXBM[k];
-function wxWalkBlock(r){const w=weatherAt();if(w==='thunder')return'外面在打雷，等雷停了再出门';if(w==='rain'&&r.acc!=='raincoat')return'外面在下雨，戴上「小雨帽」才能出门（小店有卖）';return null;}
+function wxWalkBlock(r){const w=weatherAt();if(w==='thunder')return'外面在打雷，等雷停了再出门';if(w==='rain'&&!wears(r,'raincoat'))return'外面在下雨，戴上「小雨帽」才能出门（小店有卖）';return null;}
 /* ---------- 梳毛 ---------- */
 const isMolt=t=>{const m=new Date(t).getMonth()+1;return m===3||m===4||m===9||m===10;};
 function groomBlock(r){const t=now();if(isAsleep(r,t))return`${r.name}在睡觉`;if(r.sick)return`${r.name}生病了`;if((r.fur||0)<15)return`${r.name}的毛很整齐，不用梳`;return null;}
@@ -4480,7 +4546,7 @@ Object.assign(ACT,{
 Object.assign(BM,{bk_r:['rrrr','rwwr','rwwr'],ac_specs:['xxxxx','lx.xl']});
 Object.assign(BMC,{p:BMC.p||'#5a3f28'});
 // 近视眼镜：和饰品分开画（戴了眼镜类饰品就不重复画）
-function drawWear(acc,my,pose,x,y,dir,o){try{if(my&&acc!=='glasses'&&acc!=='sunglasses')drawAcc('specs',pose,x,y,dir,o);if(acc)drawAcc(acc,pose,x,y,dir,o);}catch(e){}}
+function drawWear(acc,my,pose,x,y,dir,o){try{const L=Array.isArray(acc)?acc:acc?String(acc).split('|'):[];if(my&&!L.some(id=>EYEWEAR.has(id)))drawAcc('specs',pose,x,y,dir,o);for(const id of L)if(accSlot(id)==='b')drawAcc(id,pose,x,y,dir,o);for(const id of L)if(accSlot(id)==='a')drawAcc(id,pose,x,y,dir,o);}catch(e){}}
 // 眼睛疲劳：每看一本 +1（爱静的兔子 +1.4），每 90 分钟消退 1
 function eyeOf(r){const t=now();r.eye=r.eye||0;if(r.eyeT==null)r.eyeT=t;const k=Math.floor((t-r.eyeT)/(90*MIN));if(k>0){r.eye=Math.max(0,r.eye-k);r.eyeT+=k*90*MIN;}if(r.eye<=0)r.eyeT=t;return r.eye;}
 const bookworm=r=>r.tr.active<=40;
@@ -4576,7 +4642,7 @@ function libScreen(r){
     draw(){libRoom(this.t);
       for(const f of this.fell){const dy=f.drop!=null?Math.min(1,(f.drop+=1/60)/.4):1;rect(Math.round(f.x)-2,Math.round(40+dy*15),5,2,f.c);rect(Math.round(f.x)-2,Math.round(40+dy*15),5,1,'#f6f3ea');}
       const hidden=this.ph==='hs_hide'||this.ph==='hs_clue'||this.ph==='hs_pick';
-      if(!hidden){const pose=this.ph==='read'?'sit':this.pose;const sp=rabbitSprite(r.g,r.seed,pose,this.ph==='read'&&!r.myopia&&Math.floor(this.t*2)%7===0?'closed':'open',so);const y=58-Math.round(this.lift);drawSprite(sp,this.x,y,this.dir);drawWear(r.acc,r.myopia,pose,this.x,y,this.dir,so);
+      if(!hidden){const pose=this.ph==='read'?'sit':this.pose;const sp=rabbitSprite(r.g,r.seed,pose,this.ph==='read'&&!r.myopia&&Math.floor(this.t*2)%7===0?'closed':'open',so);const y=58-Math.round(this.lift);drawSprite(sp,this.x,y,this.dir);drawWear(wearIds(r),r.myopia,pose,this.x,y,this.dir,so);
         if(this.vItem&&BM[this.vItem])bm(this.vItem,Math.round(this.x+this.dir*9.5*so.s)-(this.dir<0?2:0),Math.round(y-5*so.s));
         if(this.item&&this.ph!=='read'){rect(Math.round(this.x+this.dir*9*so.s)-1,Math.round(y-6*so.s),3,4,this.item.c);}
         if(this.ph==='read'){const near=r.myopia?6:9;const bx0=Math.round(this.x+this.dir*near*so.s)-(this.dir<0?6:0),by=Math.round(y-7*so.s);
@@ -4977,7 +5043,7 @@ function trainMenu(r,back){const s=sportOf(r);
   return menu(`${r.name}的训练`,()=>TRAIN.map(x=>({t:x.n,s:`${SP_STN[x.id]} ${Math.floor(s[x.id])}/${SP_MAX} 级`,dis:trainBlock(r,x),h:x.d+(fitOf(r)<FIT_MAX?`（${ageText(fitNext(r)/MIN)}后体力 +1）`:'（体力满了）'),on:()=>setScreen(trainScreen(r,x,back))})).concat(['energy','vitamin'].filter(id=>owned(id)).map(id=>({t:'吃'+SHOPI[id].n,s:`有${owned(id)}个`,h:SHOPI[id].d,on:()=>useSport(r,id)}))),back||null,`体力 ${fitDots(r)}${s.boost?` · 加倍${s.boost}次`:''}`);}
 function trainScreen(r,x,back){const ab=myAb(r);const s=sportOf(r);const ctx={hs:hurdlePos(ri(1,1e9))};
   if(x.ev==='high'){const i=HJ.indexOf(hjTop(ab));ctx.k0=Math.max(0,i-3);ctx.kn=5;}
-  const C=[{u:'me',nm:r.name,g:r.g,sd:r.seed,ac:r.acc||null,my:r.myopia?1:0,out:r.out||null,k:'me'}];const done=()=>{sndClick();setScreen(trainMenu(r,back));};
+  const C=[{u:'me',nm:r.name,g:r.g,sd:r.seed,ac:wearStr(r),my:r.myopia?1:0,out:r.out||null,k:'me'}];const done=()=>{sndClick();setScreen(trainMenu(r,back));};
   const T={name:'mp',fastBtn:1,ph:'count',pt:0,t:0,et:0,acc:0,E:SPE[x.ev](ab,ctx),ctx,res:null,
     ev(){return SPN[x.ev];},st(){const[p,y]=this.E.pose();return{x:this.E.x,p,y,fell:{}};},cur(){return this.E.cur();},
     A(){if(this.ph==='play')this.E.press('A');},
@@ -5129,7 +5195,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={get FAM(){return FAM;},famStart,famTick,famCreate,famSplitScreen,famMenuItems,famLeaveView,famEnterView,realSave,homeOf,famMirror,impregnate,giveBirth,familyMenu,memberMenu,activate,feed,readSave,predictAlerts,pushPayload,pushMenuItem,get SIMQ(){return SIMQ;},cloudBackup,backupObj,bkScreen,restoreFromBackup,recoverByCode,moveMenu,taskList,taskEv,taskScreen,TASKS,wallScript,bookMenu,pet,finishPet,petZone,favSpot,callName,nameGain,toyStart,toyTap,goodnight,visitMark,routineGreet,ownerHTML,meX,get TOY(){return TOY;},get WANT(){return WANT;},set WANT(v){WANT=v;},get OWNH(){return OWNH;},sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={devGiftCheck,devGiftScreen,DEV_GIFTS,wearIds,wearOn,wearOff,setWear,wears,wearStr,accSlot,get FAM(){return FAM;},famStart,famTick,famCreate,famSplitScreen,famMenuItems,famLeaveView,famEnterView,realSave,homeOf,famMirror,impregnate,giveBirth,familyMenu,memberMenu,activate,feed,readSave,predictAlerts,pushPayload,pushMenuItem,get SIMQ(){return SIMQ;},cloudBackup,backupObj,bkScreen,restoreFromBackup,recoverByCode,moveMenu,taskList,taskEv,taskScreen,TASKS,wallScript,bookMenu,pet,finishPet,petZone,favSpot,callName,nameGain,toyStart,toyTap,goodnight,visitMark,routineGreet,ownerHTML,meX,get TOY(){return TOY;},get WANT(){return WANT;},set WANT(v){WANT=v;},get OWNH(){return OWNH;},sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
