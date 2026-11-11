@@ -272,7 +272,9 @@ function newRabbit(o){
     hunger:3,happy:3,disc:o.disc??0,weight:IDEAL[o.stage]??60,fiber:4,sugar:[],sick:null,tm:{h:0,p:0,poop:rand(0,40),f:0},calls:{},mt:0,mk:0,care:{pets:0,plays:0,snacks:0,wrong:0},
     shaped:o.stage==='adult'||o.stage==='elder',cold:0,lastPet:0,petN:0,mis:null,scared:0,zh:0,sm:0,fz:0,preg:null,nurse:0,partner:null,bond:0,seed:ri(1,999999),nestId:o.nestId??null,wasAsleep:false};
 }
-function histOf(r){const p=phen(r.g);const h=S.hist[r.id]||{};Object.assign(h,{id:r.id,name:r.name,sex:r.sex,gen:r.gen,mom:r.mom,dad:r.dad,born:r.born,colorName:p.colorName,earName:p.earName,seed:r.seed,g:r.g,title:titleP(r),partner:r.partner,stage:r.stage,uid:r.uid,ancU:r.ancU||[]});h.end=h.end||null;h.cause=h.cause||null;S.hist[r.id]=h;}
+// 2026.11.11b：在看对方家时（FAM.own），对方兔子的 id 和自己家的 id 会撞，不写进自己的家谱
+const famForeign=()=>{try{return !!(FAM&&FAM.own);}catch(e){return false;}};
+function histOf(r){const p=phen(r.g);const fo=famForeign();const h=(fo?null:S.hist[r.id])||{};Object.assign(h,{id:r.id,name:r.name,sex:r.sex,gen:r.gen,mom:r.mom,dad:r.dad,born:r.born,colorName:p.colorName,earName:p.earName,seed:r.seed,g:r.g,title:titleP(r),partner:r.partner,stage:r.stage,uid:r.uid,ancU:r.ancU||[]});h.end=h.end||null;h.cause=h.cause||null;if(!fo)S.hist[r.id]=h;return h;}
 function dexAdd(r){const p=phen(r.g);if(!S.dex[p.key]){S.dex[p.key]=1;return true;}return false;}
 // 2026.11.11a：从服务器回来的兔子会被 Firebase 丢掉空的 [] {}（嘟嘟、阿福身上少了 calls、当天纪录的清单），补齐，免得画兔舍、写日记时出错
 function rabbitFix(r){if(!r||typeof r!=='object')return r;const A=v=>Array.isArray(v)?v:v&&typeof v==='object'?Object.values(v):[];
@@ -346,8 +348,8 @@ function grow(r,to,t){
   histOf(r);
 }
 function die(r,t,cause){
-  const i=S.rabbits.indexOf(r);if(i<0)return;histOf(r);S.rabbits.splice(i,1);
-  S.hist[r.id].end=t;S.hist[r.id].cause=cause;VIS.delete(r.id);
+  const i=S.rabbits.indexOf(r);if(i<0)return;const hh=histOf(r);S.rabbits.splice(i,1);
+  hh.end=t;hh.cause=cause;if(famForeign())S.famGone=(S.famGone||[]).concat([{uid:r.uid,t,cause}]).slice(-20);// 对方的家谱由对方自己写VIS.delete(r.id);
   for(const o of S.rabbits)if(o.partner===r.id){o.partner=null;o.bond=0;}
   if(isMain(r)){S.prevMain=r.id;S.mainId=null;S.moonQ.push({id:r.id,name:r.name,cause,lived:t-r.born});log(t,`${r.name}回到月亮上了`);}
   else{const m=`${r.name}安详地回到月亮上了`;log(t,m);emit(m,'call');}
@@ -1496,7 +1498,8 @@ function familyMenu(){
     if(m&&m.away&&m.away.fam)L.push({t:`${m.name}在${m.away.to}家`,s:'陪宝宝',dis:`${m.name}在${m.away.to}家陪宝宝，断奶后会回来`,on:()=>{}});
     else if(m&&m.away&&m.away.fam)L.push({t:`${m.name}在${m.away.to}家带宝宝`,dis:'分好宝宝就会回家，用下面「去看宝宝」去看它',on:()=>{}});
     else if(m&&m.away)L.push({t:`接${m.name}回来`,s:`串门中·还剩${durText(m.away.until-t)}`,h:`${m.name}在朋友家玩，时间到会自己回来`,on:()=>setScreen(confirmScr('提早接回来',`现在就把${esc(m.name)}从朋友家接回来？`,()=>{returnHome(m,now(),true);save();toMain();cap(`你把${m.name}接回来了`,4);sndOk();},()=>setScreen(familyMenu())))});
-    if(m)L.push({t:`${m.name} ${sexS(m)}`,s:m.away?'出门串门中':'你的兔子',h:`${m.name}：${titleP(m)}`,on:()=>setScreen(profileScreen(m,()=>setScreen(familyMenu())))});
+    if(!famForeign()&&swapList().length>=2)L.push({t:'换一只来照顾',s:m?`现在：${m.name}`:'',h:'家里的兔子挑一只来照顾\n其他兔子交给电脑照顾，不会饿也不会生病',on:()=>setScreen(careSwitchMenu())});
+    if(m)L.push({t:`${m.name} ${sexS(m)}`,s:m.away?'出门串门中':'你照顾的兔子',h:`${m.name}：${titleP(m)}`,on:()=>setScreen(profileScreen(m,()=>setScreen(familyMenu())))});
     for(const o of household())if(!isMain(o))L.push({t:`${o.name} ${sexS(o)}`,s:`${m?relTo(o,m.id):'家人'}·${STAGE_N[o.stage]}`,h:`${o.name}：${titleP(o)}`,on:()=>setScreen(memberMenu(o))});
     for(const g of guests())L.push({t:`${g.name} ${sexS(g)}`,s:`客人·${g.owner}家`,h:`${g.name}：${titleP(g)}\n${ageText((g.leaveAt-t)/MIN)}后回家`,on:()=>setScreen(guestMenu(g))});
     if(m){
@@ -1511,11 +1514,33 @@ function familyMenu(){
     return L;};
   return menu('家族',items,null,`${household().length}/${CAP}只`,true);
 }
+
+/* ---------- 换一只来照顾（2026.11.11c）：家里的兔子挑一只来照顾，其他交给电脑照顾 ---------- */
+// 能换的：自己家的、不在毛窝里、没有出门、不是对方来陪宝宝的爸爸；在看对方家时不能换
+function careWhy(r){if(!r||r.temp||r.guest)return'不是你家的兔子';if(famForeign())return'在别人家不能换，回自己家再换';if(r.famOwner)return'这是朋友的兔子，来陪宝宝的';
+  if(r.stage==='nest')return'还在毛窝里喝奶，长大一点才能换';if(awayR(r))return`${r.name}现在不在家`;return null;}
+const swapList=()=>household().filter(r=>!careWhy(r));
+function switchCare(r){const t=now(),old=mainR();if(!r||careWhy(r)||isMain(r))return;
+  // 电脑照顾期间没有记饿、开心；换过来时给它一个好的开始，不会一换过来就饿、生病
+  Object.assign(r,{hunger:Math.max(3,r.hunger||0),happy:Math.max(3,r.happy||0),sick:null,mis:null,cold:0,scared:0,zh:0,sm:0,fz:0});
+  if(!Array.isArray(r.sugar))r.sugar=[];if(!r.calls)r.calls={};if(!r.tm)r.tm={h:0,p:0,poop:0,f:0};if(!r.care)r.care={pets:0,plays:0,snacks:0,wrong:0};if(r.fiber==null)r.fiber=4;
+  if(!r.adoptedAt){r.adoptedAt=t;if(r.aff==null)r.aff=(r.stage==='adult'||r.stage==='elder')?20:10;r.affT=affTier(r);r.tricks=r.tricks||[];r.firsts=r.firsts||{};r.ann={};r.farewell=0;}
+  r.wasAsleep=isAsleep(r,t);S.calls={};S.suitors=null;S.mainId=r.id;VIS.delete(r.id);if(old)VIS.delete(old.id);
+  if(old){old.mis=null;old.calls={};}
+  log(t,old?`换成照顾${r.name}，${old.name}交给电脑照顾`:`换成照顾${r.name}`);NET.dirty=true;save();}
+function careSwitchMenu(back){back=back||(()=>setScreen(familyMenu()));
+  return menu('换一只来照顾',()=>{const m=mainR(),L=[];
+    for(const r of household()){if(r.stage==='nest')continue;const why=careWhy(r),cur=isMain(r);
+      L.push({t:`${r.name} ${sexS(r)}`,s:cur?'照顾中':`${STAGE_N[r.stage]}${why?'':'·电脑照顾'}`,dis:cur?null:why,
+        h:cur?`现在照顾的就是${r.name}`:`换成照顾${r.name}\n${m?m.name+'交给电脑照顾，':''}随时可以再换回来`,
+        on:()=>{if(cur){cap(`现在照顾的就是${r.name}`,2);return;}setScreen(confirmScr('换一只来照顾',`换成照顾${esc(r.name)}？${m?`<br>${esc(m.name)}交给电脑照顾`:''}`,()=>{switchCare(r);toMain();sndCute();cap(`现在由你照顾${r.name}！${m?`\n${m.name}交给电脑照顾了`:''}`,5);},()=>setScreen(careSwitchMenu(back))));}});}
+    return L;},back,'');}
 function memberMenu(o){
   const back=()=>setScreen(familyMenu());
   if(o.famOwner){const i=S.fam&&S.fam.info;return menu(`${o.name} ${sexS(o)}`,()=>[{t:'看性格',on:()=>setScreen(profileScreen(o,()=>setScreen(memberMenu(o))))},{t:'摸摸它',on:()=>{toMain();pet(o);}},{t:`${i?i.guestNick:'朋友'}家的兔子`,s:'来陪宝宝',dis:'断奶后会回自己家',on:()=>{}}],back,'来陪宝宝');}
   return menu(`${o.name} ${sexS(o)}`,()=>[
     {t:'看性格',on:()=>setScreen(profileScreen(o,()=>setScreen(memberMenu(o))))},
+    {t:'换它来照顾',s:'电脑照顾中',dis:careWhy(o),h:`换成照顾${o.name}，随时可以再换回来`,on:()=>setScreen(confirmScr('换一只来照顾',`换成照顾${esc(o.name)}？${mainR()?`<br>${esc(mainR().name)}交给电脑照顾`:''}`,()=>{const m=mainR();switchCare(o);toMain();sndCute();cap(`现在由你照顾${o.name}！${m?`\n${m.name}交给电脑照顾了`:''}`,5);},()=>setScreen(memberMenu(o))))},
     {t:'摸摸它',on:()=>{toMain();pet(o);}},
     {t:'改名字',on:()=>setScreen(renameScr(o,()=>setScreen(memberMenu(o))))},
     {t:'送养',s:'送去好人家',dis:o.preg?'怀孕的兔子不能送养':(o.stage==='nest'?'还在喝奶，不能送养':null),on:()=>setScreen(confirmScr('送养',`把${esc(o.name)}送去好人家？之后就见不到它了。`,()=>giveAway(o),()=>setScreen(memberMenu(o))))}
@@ -3196,7 +3221,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="300" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.11a';
+const GAME_VER='2026.11.11c';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3218,7 +3243,7 @@ async function readSave(text){
 //   members{uid:true}  info{...}  lock{uid,until}（谁在跑这个家的模拟）  state{ver,t,by,home}
 //   father{r}（爸爸搬进来）  cmd/*（另一位主人的照顾动作）  split{assign,okH,okG,ver}  done{toGuest,at}
 // 同一时间只有一台手机「跑」这个家（拿到 lock 的那台），另一台跟着显示；两台都关着时，谁先打开谁接手。
-const HOME_KEYS=['t','rabbits','mainId','prevMain','nests','poops','dirtySince','light','calls','furn','wall','decor','gift','nextId','nextNest','sitter','loves','log','moonQ','suitors','pendQ','pendingGreet'];
+const HOME_KEYS=['famGone','t','rabbits','mainId','prevMain','nests','poops','dirtySince','light','calls','furn','wall','decor','gift','nextId','nextNest','sitter','loves','log','moonQ','suitors','pendQ','pendingGreet'];
 let FAM=null;
 const famUid=()=>(S.net&&S.net.uid)||'';
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -3234,7 +3259,7 @@ function famOtherNick(){const i=S.fam&&S.fam.info;if(!i)return'朋友';return S.
 function famHostNick(){const i=S.fam&&S.fam.info;return i?(S.fam.role==='host'?(S.nick||'你'):i.hostNick):'';}
 function famBusy(why){cap(`${famOtherNick()}正在照顾这一家，${why||'这个等你接手的时候再做'}\n你可以喂食、打扫、打针、开关灯、摸摸、陪它玩`,4);sndNo();}
 // ---- 生宝宝时（母兔这边）
-function famBirth(m,pr,kids,t){if(SIMQ||!pr.dadFu||!pr.dadUid)return;
+function famBirth(m,pr,kids,t){if(SIMQ||!pr.dadFu||!pr.dadUid||famForeign())return;
   S.famQ={dadFu:pr.dadFu,dadU:pr.dadUid,dadName:pr.dadName||'爸爸',born:t,wean:t+NURSE*MIN,kits:kids.map(k=>k.uid),momU:m.uid,momName:m.name,momId:m.id};}
 // 更新前就怀上的宝宝：爸爸是好友的兔子，也补开一个家
 function famRetro(){if(S.fam||S.famQ||SIMQ||!netOn())return;const t=now();S.famTried=S.famTried||{};
@@ -3247,7 +3272,7 @@ function famRetro(){if(S.fam||S.famQ||SIMQ||!netOn())return;const t=now();S.famT
     if(!fu)continue; // 好友资料还没载入，下次再看
     S.famTried[key]=1;S.famQ={dadFu:fu,dadU:H.uid,dadName:H.name||'爸爸',born,wean,kits:kids.map(k=>k.uid),momU:m.uid,momName:m.name,momId:m.id};save();return;}}
 // Firebase 会把空的 [] {} 丢掉，所以家的资料用 JSON 字串传；旧格式也补回空栏位
-const FAM_D={rabbits:[],nests:[],poops:[],calls:{},furn:[],wall:[],loves:{},decor:{},log:[],moonQ:[],pendQ:[]};
+const FAM_D={famGone:[],rabbits:[],nests:[],poops:[],calls:{},furn:[],wall:[],loves:{},decor:{},log:[],moonQ:[],pendQ:[]};
 function famFixR(r){if(!r)return r;if(!Array.isArray(r.ancU))r.ancU=r.ancU?Object.values(r.ancU):[];if(!r.calls)r.calls={};if(!Array.isArray(r.sugar))r.sugar=r.sugar?Object.values(r.sugar):[];return r;}
 function famFix(h){if(!h)return h;for(const k of HOME_KEYS){if(h[k]===undefined)h[k]=k in FAM_D?clone(FAM_D[k]):null;else if(Array.isArray(FAM_D[k])&&!Array.isArray(h[k]))h[k]=Object.values(h[k]||{});}
   if(h.light===null)h.light=true;if(h.dirtySince===null)h.dirtySince=0;h.rabbits=h.rabbits.filter(Boolean);h.rabbits.forEach(famFixR);return h;}
@@ -3282,33 +3307,40 @@ function famStart(){if(!S.fam||FAM)return;FAM={fid:S.fam.fid,role:S.fam.role,vie
 function famEnterView(home){if(!FAM||FAM.own||FAM.role!=='guest'||!home)return;home=famFix(clone(home));FAM.own=homeOf(S);S=Object.assign(personalOf(S),home);VIS.clear();FX.length=0;if(mode==='main')toMain();}
 function famLeaveView(){if(!FAM||!FAM.own)return;const home=homeOf(S);try{localStorage.setItem('tuwo_famhome',JSON.stringify(home));}catch(e){}S=Object.assign(personalOf(S),FAM.own);FAM.own=null;VIS.clear();FX.length=0;famDadFix();}
 function famOnData(d){if(!FAM)return;FAM.data=d||{};const me=famUid();
-  if(d&&d.done)return famDone(d.done);
-  const st=d&&d.state;
+  const st=d&&d.state;if(st&&st.ver>(FAM.vmax||0))FAM.vmax=st.ver;
+  // 2026.11.11b：妈妈那边很久没开、一回来就看到 done：先套用对方最后的家（爸爸和宝宝已送走、时间也是最新的），再结束；以前会用几天前的旧家补跑，兔子饿死
+  if(d&&d.done){if(FAM.role==='host'){const H=famHomeOf(st);if(H&&st.ver>(FAM.ver||0)&&st.by!==me){Object.assign(S,H);FAM.ver=st.ver;famHistFill();}}return famDone(d.done);}
   const H=famHomeOf(st);if(FAM.role==='guest'&&FAM.view&&!FAM.own&&H)famEnterView(H);
   // 2026.11.11a：只有「正在这个家」才套用（妈妈那边，或爸爸那边正在看对方家）。以前爸爸那边回到自己家时也会被盖成对方家，存成自己的家（嘟嘟家变成豆沙家）
-  if(H&&st.ver>(FAM.ver||0)&&st.by!==me&&!FAM.holder&&(FAM.role==='host'||FAM.own)){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(H));}catch(e){}}
+  if(H&&st.ver>(FAM.ver||0)&&st.by!==me&&!FAM.holder&&(FAM.role==='host'||FAM.own)){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='host')famHistFill();if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(H));}catch(e){}}
   famAliveSave();
   if(FAM.holder){famTakeFather(d);famTakeCmds(d);famCheckSplit(d);}}
 // ---- 跑模拟的那台：轮流接手
 async function famTick(){if(!FAM||!netOn()||!NET.tok)return;const me=famUid(),t=Date.now();
   if(!FAM.data&&!NET.es.fam)famListen();
   if(document.hidden||!FAM.view){if(FAM.holder){await famPublish(true);try{await api('PUT',`families/${FAM.fid}/lock`,{uid:me,until:0});}catch(e){}FAM.holder=false;}return;}
+  // 2026.11.11b：手机冻结（锁屏）超过 30 秒、或锁已经是别人的 → 不再是跑模拟的那台，重新排队（以前两台都以为自己在跑，从此各算各的）
+  if(FAM.holder&&FAM.lastTick&&t-FAM.lastTick>30000)FAM.holder=false;FAM.lastTick=t;
+  if(FAM.holder){const L0=FAM.data&&FAM.data.lock;if(L0&&L0.uid&&L0.uid!==me&&L0.until>t){FAM.holder=false;const st=FAM.data.state,H=famHomeOf(st);if(H&&st.ver>(FAM.ver||0)&&st.by!==me&&(FAM.role==='host'||FAM.own)){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='host')famHistFill();}return;}}
   if(FAM.holder){if(t-FAM.hb>15000){FAM.hb=t;api('PUT',`families/${FAM.fid}/lock`,{uid:me,until:t+45000}).catch(()=>{FAM.holder=false;});}
     famCheckSplit(FAM.data||{});if(FAM&&(FAM.dirty||t-FAM.pubAt>60000))famPublish(false);return;}
   const L=FAM.data&&FAM.data.lock;if(!FAM.data)return;
+  if(FAM.role==='guest'&&!FAM.own)return;// 爸爸那边还没进到对方家（没有对方家的资料）就不接手，免得把自己的家当成这个家发布出去
   if(!L||L.uid===me||!(L.until>t)){try{await api('PUT',`families/${FAM.fid}/lock`,{uid:me,until:t+45000});}catch(e){return;}
-    FAM.hb=t;const st=FAM.data.state,H=famHomeOf(st);if(H&&st.ver>(FAM.ver||0)&&st.by!==me){Object.assign(S,H);FAM.ver=st.ver;}famGapSitter();
+    FAM.hb=t;const st=FAM.data.state,H=famHomeOf(st);if(H&&st.ver>(FAM.ver||0)&&st.by!==me){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='host')famHistFill();}famGapSitter();
     FAM.holder=true;const prev=mode;tick(false);famTakeFather(FAM.data);famTakeCmds(FAM.data);famCheckSplit(FAM.data);famPublish(true);
     if(prev==='main'&&mode==='main')cap(`现在由你照顾${famHostNick()}家的兔子`,3);}}
 async function famPublish(force){if(!FAM||!FAM.holder)return;famAliveSave();const t=Date.now();if(!force&&t-FAM.pubAt<15000)return;
   const home=clone(homeOf(S));if(Array.isArray(home.log))home.log=home.log.slice(-40);
-  const st={ver:(FAM.ver||0)+1,t:S.t,by:famUid(),at:{'.sv':'timestamp'},j:JSON.stringify(home)};FAM.ver=st.ver;FAM.pubAt=t;FAM.dirty=false;
+  // 2026.11.11b：版本号一定比看过的都大（重载后 FAM.ver 从 0 开始，以前会发出 1、2、3，被对方当成旧的）
+  const st={ver:Math.max(FAM.ver||0,FAM.vmax||0)+1,t:S.t,by:famUid(),at:{'.sv':'timestamp'},j:JSON.stringify(home),ck:JSON.stringify((FAM.ck||[]).slice(-60))};FAM.ver=st.ver;FAM.vmax=st.ver;FAM.pubAt=t;FAM.dirty=false;
   if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(home));}catch(e){}
   try{await api('PUT',`families/${FAM.fid}/state`,st);}catch(e){}}
 function famMark(){if(FAM&&FAM.holder)FAM.dirty=true;}
 function famTakeFather(d){const f=d&&d.father;let fr=null;if(f&&f.j)try{fr=JSON.parse(f.j);}catch(e){}if(!fr&&f&&f.r)fr=famFixR(clone(f.r));if(!fr)return;const i=S.fam.info;
   if(!S.rabbits.some(r=>r.uid===fr.uid)){const r=fr;r.id=S.nextId++;r.famOwner=i.guest;r.away=null;r.partner=null;r.mis=null;r.calls={};r.cold=0;r.scared=0;r.temp=false;
-    S.rabbits.push(r);VIS.delete(r.id);const m=`${i.guestNick}家的${r.name}搬来陪宝宝了`;log(now(),m);if(mode==='main')cap(m,4);famMark();}
+    S.rabbits.push(r);VIS.delete(r.id);const m=`${i.guestNick}家的${r.name}搬来陪宝宝了`;log(now(),m);if(mode==='main')cap(m,4);famMark();
+    const fid=FAM.fid;famPublish(true).then(()=>api('DELETE',`families/${fid}/father`).catch(()=>{}));return;}
   api('DELETE',`families/${FAM.fid}/father`).catch(()=>{});}
 // ---- 另一位主人的照顾动作
 // 上门保姆阿姨：在房间里慢慢走来走去，偶尔蹲下来添草、摸摸兔子（大人的身高，差不多到天花板的三分之二）
@@ -3397,8 +3429,10 @@ function famSitSet(h,by){const t=now();if(h>0){S.sitter={at:t,until:t+h*60*MIN,h
 function famSitter(h){toMain();const me=S.nick||'你';if(famMirror()){famCmd({k:'sit',h});const t=now();S.sitter=h>0?{at:t,until:t+h*60*MIN,home:1,by:me}:null;cap(h>0?`请了保姆阿姨来家里照顾${h}小时\n${famOtherNick()}那边也一样`:'保姆阿姨回家了',4);sndOk();return;}
   famSitSet(h,me);sndOk();save();try{famPublish(true);}catch(e){}}
 function famCmd(o){if(!FAM)return;o.by=famUid();o.nick=S.nick||'朋友';o.at=Date.now();api('POST',`families/${FAM.fid}/cmd`,o).catch(()=>{cap('没送出去，等一下再试',3);});}
-function famTakeCmds(d){const L=d&&d.cmd;if(!L)return;FAM.doneCmd=FAM.doneCmd||{};
-  let n=0;for(const[k,c]of Object.entries(L)){if(FAM.doneCmd[k])continue;FAM.doneCmd[k]=1;n++;try{famApply(c);}catch(e){console.error(e);}api('DELETE',`families/${FAM.fid}/cmd/${k}`).catch(()=>{});}if(n)famPublish(true);}
+// 2026.11.11b：做过的指令记在存档（S.famCmd）和这个家的资料（state.ck）里，换手机跑、重载都不会再做一次
+function famTakeCmds(d){const L=d&&d.cmd;if(!L)return;if(!S.famCmd||S.famCmd.fid!==FAM.fid)S.famCmd={fid:FAM.fid,k:[]};const D=S.famCmd.k;
+  let ck=[];try{ck=JSON.parse(d.state&&d.state.ck||'[]');}catch(e){}FAM.ck=FAM.ck||ck.slice();
+  let n=0;for(const[k,c]of Object.entries(L)){if(D.includes(k)||ck.includes(k)){api('DELETE',`families/${FAM.fid}/cmd/${k}`).catch(()=>{});continue;}D.push(k);FAM.ck.push(k);n++;try{famApply(c);}catch(e){console.error(e);}}if(n){if(D.length>200)D.splice(0,D.length-200);save();const ks=Object.keys(L);famPublish(true).then(()=>{for(const k of ks)api('DELETE',`families/${FAM&&FAM.fid}/cmd/${k}`).catch(()=>{});});}}
 function famApply(c){if(mode==='main')return famApply0(c);const tm=toMain;toMain=()=>{};try{famApply0(c);}finally{toMain=tm;}if(typeof renderUI==='function')try{renderUI();}catch(e){}}
 function famApply0(c){const r=c.rid?S.rabbits.find(x=>x.uid===c.rid):mainR();const who=String(c.nick||'朋友').slice(0,8);
   if(c.k==='feed'&&r){const keep=mode;feed(r,c.type);if(keep!=='main'&&M)renderUI();cap(`${who}喂${r.name}吃东西`,3);}
@@ -3469,6 +3503,9 @@ function famDone(done){if(!FAM||!S.fam)return;const i=S.fam.info,fid=FAM.fid;S.f
     S.fam=null;save();if(mode!=='main')toMain();const names=kidU.map(u=>(L.find(r=>r.uid===u)||{}).name).filter(Boolean);
     if(mode==='main')cap(`${i.dadName}${names.length?'带着'+names.join('、'):''}回${i.guestNick}家了`,6);}}
 
+// 妈妈那边套用对方跑出来的家以后，补上自己家谱里没有的兔子（例如对方跑模拟时长大、出生的）
+function famHistFill(){for(const r of S.rabbits){const h=S.hist[r.id];if(!h||h.uid!==r.uid)histOf(r);}
+  for(const g of S.famGone||[]){const h=Object.values(S.hist).find(x=>x.uid===g.uid);if(h&&!h.end){h.end=g.t;h.cause=g.cause;}}}
 // 2026.11.11a：修复「自己的家被存成对方家」（两家一起带结束后，爸爸那边家里出现妈妈家的兔子，主角变成对方的兔子）。
 // 到服务器查这个家的资料：对方（host）的兔子、留在对方家的宝宝 → 从自己家移走；主角换回爸爸；不是自己买的家具拿下来。
 let FAMR_AT=0;
@@ -3517,7 +3554,7 @@ let FAMN=0;function famNotice(){if(!FAM||mode!=='main'||M||!S.fam)return;const s
 function famMenuItems(){if(!S.fam)return[];const i=S.fam.info,L=[];const sp=FAM&&FAM.data&&FAM.data.split;
   const wean=now()>=i.wean;
   L.push({t:'分宝宝',s:sp?(sp.okH&&sp.okG?'分好了':'一起决定'):now()>=i.wean?'准备中':`${ageText(Math.max(0,(i.wean-now())/MIN))}后断奶`,h:wean?`宝宝断奶了，和${famOtherNick()}一起决定哪几只跟爸爸回家`:`宝宝断奶以后，再和${famOtherNick()}一起决定哪几只跟爸爸回家`,on:()=>setScreen(famSplitScreen())});
-  if(S.fam.role==='guest')L.push(FAM&&FAM.view?{t:'回自己家看看',s:'',h:`回去看看自己家（${i.dadName}还在${i.hostNick}家）`,on:()=>{famLeaveView();FAM.view=false;S.fam.viewFam=false;FAM.holder=false;save();toMain();}}:
+  if(S.fam.role==='guest')L.push(FAM&&FAM.view?{t:'回自己家看看',s:'',h:`回去看看自己家（${i.dadName}还在${i.hostNick}家）`,on:()=>{if(FAM.holder){famPublish(true);api('PUT',`families/${FAM.fid}/lock`,{uid:famUid(),until:0}).catch(()=>{});}famLeaveView();FAM.view=false;S.fam.viewFam=false;FAM.holder=false;save();toMain();}}:
     {t:`去${i.hostNick}家看宝宝`,s:'',h:'一起照顾这一家子',on:()=>{FAM.view=true;S.fam.viewFam=true;let h=null;const st=FAM.data&&FAM.data.state;h=famHomeOf(st);if(!h)try{h=JSON.parse(localStorage.getItem('tuwo_famhome')||'null');}catch(e){}if(h)famEnterView(h);save();toMain();}});
   return L;}
 
@@ -5301,7 +5338,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={famHostCopyFix,famOnData,famDadFix,famFinish,famAliveSave,famDone,famOrphanFix,devGiftCheck,devGiftScreen,DEV_GIFTS,wearIds,wearOn,wearOff,setWear,wears,wearStr,accSlot,get FAM(){return FAM;},famStart,famTick,famCreate,famSplitScreen,famMenuItems,famLeaveView,famEnterView,realSave,homeOf,famMirror,impregnate,giveBirth,familyMenu,memberMenu,activate,feed,readSave,predictAlerts,pushPayload,pushMenuItem,get SIMQ(){return SIMQ;},cloudBackup,backupObj,bkScreen,restoreFromBackup,recoverByCode,moveMenu,taskList,taskEv,taskScreen,TASKS,wallScript,bookMenu,pet,finishPet,petZone,favSpot,callName,nameGain,toyStart,toyTap,goodnight,visitMark,routineGreet,ownerHTML,meX,get TOY(){return TOY;},get WANT(){return WANT;},set WANT(v){WANT=v;},get OWNH(){return OWNH;},sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={switchCare,careSwitchMenu,careWhy,swapList,memberMenu,famCmd,netClose,die,famHostCopyFix,famOnData,famDadFix,famFinish,famAliveSave,famDone,famOrphanFix,devGiftCheck,devGiftScreen,DEV_GIFTS,wearIds,wearOn,wearOff,setWear,wears,wearStr,accSlot,get FAM(){return FAM;},famStart,famTick,famCreate,famSplitScreen,famMenuItems,famLeaveView,famEnterView,realSave,homeOf,famMirror,impregnate,giveBirth,familyMenu,memberMenu,activate,feed,readSave,predictAlerts,pushPayload,pushMenuItem,get SIMQ(){return SIMQ;},cloudBackup,backupObj,bkScreen,restoreFromBackup,recoverByCode,moveMenu,taskList,taskEv,taskScreen,TASKS,wallScript,bookMenu,pet,finishPet,petZone,favSpot,callName,nameGain,toyStart,toyTap,goodnight,visitMark,routineGreet,ownerHTML,meX,get TOY(){return TOY;},get WANT(){return WANT;},set WANT(v){WANT=v;},get OWNH(){return OWNH;},sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
