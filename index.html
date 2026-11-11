@@ -254,7 +254,7 @@ function uniquePersona(mom,dad,taken){let p;for(let i=0;i<60;i++){p=genPersona(m
 let S=null,DBG=0;
 const now=()=>Date.now()+DBG;
 function fresh(){return{v:2,t:Math.floor(now()/MIN)*MIN,nextId:1,nextNest:1,rabbits:[],mainId:null,prevMain:null,nests:[],poops:[],dirtySince:0,light:true,calls:{},sitter:null,suitors:null,sound:true,log:[],dex:{},hist:{},seen:{},moonQ:[],tut:0,started:false,best:{},shell:'lavender',nick:'',usedCodes:[],myCodes:[],album:[],treasures:{},sup:{last:{}},decor:{},pendQ:[],gift:null};}
-function migrate(){if((S.lifeV||1)<2){S.lifeV=2;const t=now();for(const r of S.rabbits){if(r.life!=null)r.life=clamp(r.life+18,30,38);if(r.stage==='elder'&&(t-r.born)/MIN<ELDER_AT)r.stage='adult';}}if(S.lifeV<3){S.lifeV=3;const t=now();for(const r of S.rabbits){lifeFix(r);if(r.nurse>t)r.nurse+=1440*MIN;}if(S.famQ&&S.famQ.wean>t)S.famQ.wean+=1440*MIN;}for(const r of S.rabbits){if(!r.uid)r.uid=rid();}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
+function migrate(){if((S.lifeV||1)<2){S.lifeV=2;const t=now();for(const r of S.rabbits){if(r.life!=null)r.life=clamp(r.life+18,30,38);if(r.stage==='elder'&&(t-r.born)/MIN<ELDER_AT)r.stage='adult';}}if(S.lifeV<3){S.lifeV=3;const t=now();for(const r of S.rabbits){lifeFix(r);if(r.nurse>t)r.nurse+=1440*MIN;}if(S.famQ&&S.famQ.wean>t)S.famQ.wean+=1440*MIN;}for(const r of S.rabbits){if(!r.uid)r.uid=rid();rabbitFix(r);}for(const k in S.hist){const h=S.hist[k];if(!h.uid){const r=S.rabbits.find(x=>x.id===h.id);h.uid=r?r.uid:rid();}}if(!Array.isArray(S.usedCodes))S.usedCodes=[];const mm=S.rabbits.find(r=>r.id===S.mainId);if(mm){if(mm.aff==null){mm.aff=30;mm.affT=1;}if(!mm.adoptedAt)mm.adoptedAt=Date.now();mm.tricks=mm.tricks||[];mm.firsts=mm.firsts||{};}if(!S.firstPlay)S.firstPlay=Date.now();if(!Array.isArray(S.myCodes))S.myCodes=[];}
 function load(){try{const s=localStorage.getItem(KEY);if(s){const o=JSON.parse(s);if(o&&o.v===2){S=Object.assign(fresh(),o);migrate();return;}}}catch(e){}S=fresh();S.lifeV=3;}
 function save(){if(window.__noSave)return;try{localStorage.setItem(KEY,JSON.stringify(realSave()));}catch(e){}try{famMark();}catch(e){}try{netBackup();}catch(e){}try{netMark();}catch(e){}}
 const byId=id=>S.rabbits.find(r=>r.id===id);
@@ -274,7 +274,14 @@ function newRabbit(o){
 }
 function histOf(r){const p=phen(r.g);const h=S.hist[r.id]||{};Object.assign(h,{id:r.id,name:r.name,sex:r.sex,gen:r.gen,mom:r.mom,dad:r.dad,born:r.born,colorName:p.colorName,earName:p.earName,seed:r.seed,g:r.g,title:titleP(r),partner:r.partner,stage:r.stage,uid:r.uid,ancU:r.ancU||[]});h.end=h.end||null;h.cause=h.cause||null;S.hist[r.id]=h;}
 function dexAdd(r){const p=phen(r.g);if(!S.dex[p.key]){S.dex[p.key]=1;return true;}return false;}
-function addHouse(r){S.rabbits.push(r);histOf(r);dexAdd(r);}
+// 2026.11.11a：从服务器回来的兔子会被 Firebase 丢掉空的 [] {}（嘟嘟、阿福身上少了 calls、当天纪录的清单），补齐，免得画兔舍、写日记时出错
+function rabbitFix(r){if(!r||typeof r!=='object')return r;const A=v=>Array.isArray(v)?v:v&&typeof v==='object'?Object.values(v):[];
+  r.ancU=A(r.ancU);r.sugar=A(r.sugar);if(!r.calls||typeof r.calls!=='object')r.calls={};if(!r.tr||typeof r.tr!=='object')r.tr={brave:50,active:50,cuddly:50,greedy:50,naughty:50,temper:50};
+  r.tm=Object.assign({h:0,p:0,poop:0,f:0},r.tm||{});r.care=Object.assign({pets:0,plays:0,snacks:0,wrong:0},r.care||{});
+  if(r.tricks!=null)r.tricks=A(r.tricks);if(r.firsts!=null&&typeof r.firsts!=='object')r.firsts={};if(r.ann!=null&&typeof r.ann!=='object')r.ann={};
+  if(r.dd&&typeof r.dd==='object'){for(const k of['tr','games','walks','found','guests'])r.dd[k]=A(r.dd[k]);for(const k of['hay','pel','fav','hate','pets','wrong','right','med','clean','gift','hungry','dirty','tricks','groom','nail'])if(typeof r.dd[k]!=='number')r.dd[k]=0;}
+  return r;}
+function addHouse(r){rabbitFix(r);S.rabbits.push(r);histOf(r);dexAdd(r);}
 const anc=id=>byId(id)||S.hist[id]||null;
 function isDesc(o,refId){let fr=[o],d=0;while(fr.length&&d<5){const nx=[];for(const x of fr)for(const p of[x.mom,x.dad]){if(p==null)continue;if(p===refId)return true;const a=anc(p);if(a)nx.push(a);}fr=nx;d++;}return false;}
 function relTo(o,refId){
@@ -3189,7 +3196,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="300" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.10c';
+const GAME_VER='2026.11.11a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -3278,7 +3285,8 @@ function famOnData(d){if(!FAM)return;FAM.data=d||{};const me=famUid();
   if(d&&d.done)return famDone(d.done);
   const st=d&&d.state;
   const H=famHomeOf(st);if(FAM.role==='guest'&&FAM.view&&!FAM.own&&H)famEnterView(H);
-  if(H&&st.ver>(FAM.ver||0)&&st.by!==me&&!FAM.holder){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(H));}catch(e){}}
+  // 2026.11.11a：只有「正在这个家」才套用（妈妈那边，或爸爸那边正在看对方家）。以前爸爸那边回到自己家时也会被盖成对方家，存成自己的家（嘟嘟家变成豆沙家）
+  if(H&&st.ver>(FAM.ver||0)&&st.by!==me&&!FAM.holder&&(FAM.role==='host'||FAM.own)){Object.assign(S,H);FAM.ver=st.ver;if(FAM.role==='guest')try{localStorage.setItem('tuwo_famhome',JSON.stringify(H));}catch(e){}}
   famAliveSave();
   if(FAM.holder){famTakeFather(d);famTakeCmds(d);famCheckSplit(d);}}
 // ---- 跑模拟的那台：轮流接手
@@ -3460,6 +3468,31 @@ function famDone(done){if(!FAM||!S.fam)return;const i=S.fam.info,fid=FAM.fid;S.f
     if(!mainR()){const m=S.rabbits.find(r=>r.uid===i.momU)||S.rabbits[0];if(m)S.mainId=m.id;}
     S.fam=null;save();if(mode!=='main')toMain();const names=kidU.map(u=>(L.find(r=>r.uid===u)||{}).name).filter(Boolean);
     if(mode==='main')cap(`${i.dadName}${names.length?'带着'+names.join('、'):''}回${i.guestNick}家了`,6);}}
+
+// 2026.11.11a：修复「自己的家被存成对方家」（两家一起带结束后，爸爸那边家里出现妈妈家的兔子，主角变成对方的兔子）。
+// 到服务器查这个家的资料：对方（host）的兔子、留在对方家的宝宝 → 从自己家移走；主角换回爸爸；不是自己买的家具拿下来。
+let FAMR_AT=0;
+async function famHostCopyFix(){if(!S||S.fam||!S.famGot||!netOn()||!NET.tok||Date.now()-FAMR_AT<60000)return;
+  const todo=Object.keys(S.famGot).filter(fid=>!(S.famRep&&S.famRep[fid]));if(!todo.length)return;FAMR_AT=Date.now();
+  for(const fid of todo){let d=null,hp=null;try{d=await api('GET','families/'+fid);}catch(e){continue;}
+    S.famRep=S.famRep||{};if(!d||!d.info||!d.members){S.famRep[fid]=1;save();continue;}
+    const i=d.info,me=famUid();if(!me)continue;if(i.guest!==me){S.famRep[fid]=1;save();continue;}
+    try{hp=await api('GET','players/'+i.host);}catch(e){continue;}
+    const sp=d.split&&d.split.assign||{};const mine=new Set([i.dadU,...Object.keys(sp).filter(u=>sp[u]==='g')]);
+    const theirs=new Set([i.momU,...(i.kits||[]).filter(u=>!mine.has(u)),...Object.keys((hp&&hp.rb)||{})]);for(const u of mine)theirs.delete(u);
+    const gone=S.rabbits.filter(r=>theirs.has(r.uid)&&!r.guest);
+    if(gone.length){for(const r of gone){const k=S.rabbits.indexOf(r);if(k>=0)S.rabbits.splice(k,1);VIS.delete(r.id);}
+      S.moonQ=(S.moonQ||[]).filter(q=>!gone.some(r=>r.id===q.id));
+      S.nests=(S.nests||[]).filter(n=>S.rabbits.some(r=>r.nestId===n.id));
+      if(!mainR()||theirs.has(mainR().uid)){const dad=S.rabbits.find(r=>r.uid===i.dadU)||S.rabbits[0];S.mainId=dad?dad.id:null;}
+      if(S.sitter&&S.sitter.home)S.sitter=null;
+      // 家具、墙饰：只留自己有的
+      const has=id=>(S.inv&&S.inv[id]>0);S.furn=(S.furn||[]).filter(f=>has(f.id));S.wall=(S.wall||[]).filter(w=>w.id==='w_carrot'||has(w.id));
+      S.poops=[];S.dirtySince=0;
+      const dad=S.rabbits.find(r=>r.uid===i.dadU);const kids=S.rabbits.filter(r=>mine.has(r.uid)&&r.uid!==i.dadU);
+      const m=`修好了！这里是你自己的家：${dad?dad.name:'爸爸'}${kids.length?'和'+kids.map(k=>k.name).join('、'):''}都在。${gone.map(r=>r.name).join('、')}一直在${i.hostNick}家`;
+      log(now(),m);S.dadFixMsg=m;if(mode!=='main')toMain();NET.dirty=true;}
+    S.famRep[fid]=1;save();}}
 // 2026.11.10c：两家一起带已经结束（或被清掉），身上还挂着 away.fam 的兔子就是已经回家了
 function famOrphanFix(){if(!S||!S.rabbits)return;let n=0;
   for(const r of S.rabbits)if(r.away&&r.away.fam&&!(S.fam&&S.fam.fid===r.away.fam)){const fid=r.away.fam;r.away=null;VIS.delete(r.id);n++;
@@ -5149,8 +5182,12 @@ function checkQueue(){
   if(S.moonQ.length){setScreen(moonScreen(S.moonQ[0]));return;}
   if(S.started&&!mainR()){setScreen(successorScreen());return;}
 }
+let TICK_FIRST=false;
+// 自己的家可能被存成对方家、还没修好：先别补跑时间（以免对方兔子的复本在这里被饿死），等修好或最多 25 秒
+const famRepWait=()=>!S.fam&&S.famGot&&Object.keys(S.famGot).some(f=>!(S.famRep&&S.famRep[f]))&&performance.now()<25000;
 function tick(first){
-  famDadFix();if(!(FAM&&FAM.own))famOrphanFix();
+  famDadFix();if(!(FAM&&FAM.own))famOrphanFix();if(!S.fam)famHostCopyFix();
+  if(famRepWait()){if(first)TICK_FIRST=true;return;}if(TICK_FIRST){first=true;TICK_FIRST=false;}
   if(famMirror())return;
   if(S.fam&&FAM&&FAM.view)famGapSitter();
   const target=now();if(S.t>target+5*MIN)S.t=Math.floor(target/MIN)*MIN;if(target-S.t<MIN&&!first)return;
@@ -5264,7 +5301,7 @@ boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
 setTimeout(()=>{try{netStart();}catch(e){}},800);window.addEventListener('online',()=>{if(!netOn())netStart();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&netOn())netPublish(true);});
 setInterval(()=>{try{if(mode==='main'&&S.net&&S.net.inq&&S.net.inq.length&&!SPEC&&!DREAM)checkQueue();}catch(e){}},2000);
-window.__bunny={famDadFix,famFinish,famAliveSave,famDone,famOrphanFix,devGiftCheck,devGiftScreen,DEV_GIFTS,wearIds,wearOn,wearOff,setWear,wears,wearStr,accSlot,get FAM(){return FAM;},famStart,famTick,famCreate,famSplitScreen,famMenuItems,famLeaveView,famEnterView,realSave,homeOf,famMirror,impregnate,giveBirth,familyMenu,memberMenu,activate,feed,readSave,predictAlerts,pushPayload,pushMenuItem,get SIMQ(){return SIMQ;},cloudBackup,backupObj,bkScreen,restoreFromBackup,recoverByCode,moveMenu,taskList,taskEv,taskScreen,TASKS,wallScript,bookMenu,pet,finishPet,petZone,favSpot,callName,nameGain,toyStart,toyTap,goodnight,visitMark,routineGreet,ownerHTML,meX,get TOY(){return TOY;},get WANT(){return WANT;},set WANT(v){WANT=v;},get OWNH(){return OWNH;},sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
+window.__bunny={famHostCopyFix,famOnData,famDadFix,famFinish,famAliveSave,famDone,famOrphanFix,devGiftCheck,devGiftScreen,DEV_GIFTS,wearIds,wearOn,wearOff,setWear,wears,wearStr,accSlot,get FAM(){return FAM;},famStart,famTick,famCreate,famSplitScreen,famMenuItems,famLeaveView,famEnterView,realSave,homeOf,famMirror,impregnate,giveBirth,familyMenu,memberMenu,activate,feed,readSave,predictAlerts,pushPayload,pushMenuItem,get SIMQ(){return SIMQ;},cloudBackup,backupObj,bkScreen,restoreFromBackup,recoverByCode,moveMenu,taskList,taskEv,taskScreen,TASKS,wallScript,bookMenu,pet,finishPet,petZone,favSpot,callName,nameGain,toyStart,toyTap,goodnight,visitMark,routineGreet,ownerHTML,meX,get TOY(){return TOY;},get WANT(){return WANT;},set WANT(v){WANT=v;},get OWNH(){return OWNH;},sitterEnd,sitterMeetCheck,sitterMeets,sitWindow,dateScreen,digS,shovels,startDig,digMenu,DIGP,previewScreen,drawPreview,giftMenu2,giftSend,recvItem,giftableIds,placeWall,wallFix,drawWallItem,SHOP,receiveCode,mkCode,OUTSIDE,outsideTick,WIN,start,CAM,WW,FURN_X,FURN_Y,FY0,FY1,camX,stageOpts,furnEnts,placeFurn,wardrobeMenu,favToy,OUTFIT,buy,libScreen,libEnter,libBookMenu,BOOKS,eyeOf,drawWear,useSport,shopList,SHOPI,drawFurn,furnScript,trainMenu,trainScreen,TRAIN,fitOf,hjTop,sportAb,sportMeet,sportSolo,sportMenu,sportPick,inviteSport,joinSport,sportLobby,SPE,SPAI,SPORTS,hurdlePos,sportOf,spKey,sportAIs,myAb,netRelink,netRestoreId,api,addCoins,shopMenu,buy,SHOP,myStuffMenu,useSnack,placeFurn,weatherAt,groomScreen,nailScreen,noteScreen,emoteMenu,recvNote,recvEmote,notesScreen,drawAcc,dailyGiftMenu,giftedToday,inviteCarrot,joinCarrot,carrotGame,carrotItems,parkScreen,sendDGift,recvDGift,sendVisitH,stayMenu,recvBack,sendBackReport,guestCare,recoverByCode,recoverScreen,haveRabbitScreen,fileLauncher,installScreen,maybeInstallGuide,isStandalone,moveToWeb,webReceive,moveWebScreen,exportSave,readSave,moveMenu,importScreen,showStart,GAME_VER,NET,netStart,netS,netPublish,netAddFriendCode,netFriendsMenu,netRabbitMenu,netLiveRabbits,sendODate,inboxScreen,codeScreen,proposeBlock,loveAdd,loveV,loveRec,missOf,guestDate,loveExport,LOVE_MATE,dateScreen,dateP,dateK,recvDateR,sendVisit,returnHome,awayR,homeAway,friendOf,friendSaw,friendsMenu,friendMenu,friendRabbitMenu,sendPropose,recvPropose,simRace,raceScreen,sendRace,impregnate,angerLeft,soothe,grudge,DD,diaryText,writeDiary,diaryScreen,maybeAdventure,renderPostcard,postcardScreen,setWH(h){W_HOUR=h},walkBlock,get M(){return M},startWalk,walkMenu,SCENES,startAct:(r,a)=>start(r,vis(r),a),clearCap(){capUntil=0;},surpriseCheck,affAdd,affTier,runScript,collectGift,albumScreen,treasureScreen,festivalOf,get SPEC(){return SPEC;},set SPEC(v){SPEC=v;},get DREAM(){return DREAM;},set DREAM(v){DREAM=v;},flushSnaps,TRICKS,trickMenu,mkCode,readCode,receiveCode,guests,guestMate,crossRelated,packR,unpackR,netMenu,codeScreen,ancestorsU,recvVisit,resetMenu,resetPet,confirmScr,startCatch,startWhack,startSimon,startSnake,startBlocks,GAMES,quitGame,get S(){return S;},set S(v){S=v;},skip(min){DBG+=min*MIN;tick(false);},skipQuiet(min){DBG+=min*MIN;runTo(now());},now,phen,cross,rndGenome,genPersona,titleP,uniquePersona,compat,stepMinute,runTo,newLitter,finishPick,mainR,household,visible,vis,VIS,get mode(){return mode;},get M(){return M;},press,toMain,setScreen,feed,pet,scold,medicine,doMate,mateBlock,takeSuitor,genSuitors,suitorMenu,giveAway,chooseSuccessor,startHop,startGuess,rabbitSprite,drawPen,checkQueue,save,load,needList,profileScreen,familyMenu,bookMenu,dexScreen,familyTree,talkScreen,helpScreen,successorScreen,relTo,isDesc,initMain,activate,tutEnter};
 </script>
 
 </html>
