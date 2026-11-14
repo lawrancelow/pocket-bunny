@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>口袋兔子 · 玩家纪录</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f4effa;--card:#fff;--ink:#2a2531;--sub:#6e6578;--line:#e4dcef;--acc:#7d5ba6;--ok:#2f8a57;--warn:#b5651d;--dim:#9a91a5;--chip:#efe8f7}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1822;--card:#27222f;--ink:#f1ecf6;--sub:#b3a9be;--line:#3a3344;--acc:#c4a6ee;--ok:#6fcf97;--warn:#f2b46d;--dim:#7d7488;--chip:#352e3f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 -apple-system,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif}
+header{padding:20px 16px 8px;max-width:980px;margin:0 auto}
+h1{font-size:24px;margin:0 0 4px}
+.sub{color:var(--sub);font-size:15px}
+main{max-width:980px;margin:0 auto;padding:0 16px 40px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.stat b{display:block;font-size:30px;line-height:1.1}
+.stat span{color:var(--sub);font-size:14px}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 14px}
+button{font:inherit;font-size:16px;padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin:10px 0}
+.top{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.name{font-size:20px;font-weight:700}
+.when{font-size:15px;color:var(--sub)}
+.live{color:var(--ok);font-weight:700}
+.rows{display:grid;grid-template-columns:5.5em 1fr;gap:4px 10px;margin-top:8px;font-size:16px}
+.rows .k{color:var(--sub)}
+.chip{display:inline-block;background:var(--chip);border-radius:8px;padding:1px 8px;margin:2px 4px 2px 0;font-size:15px}
+.opens{font-size:14px;color:var(--sub);margin-top:6px;line-height:1.7}
+.old{opacity:.75}
+.msg{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:16px 0;font-size:17px}
+.note{color:var(--sub);font-size:14px;margin-top:20px;line-height:1.7}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>玩家纪录</h1>
+  <div class="sub" id="sub">读取中…</div>
+</header>
+<main>
+  <div id="out"></div>
+  <p class="note">每台手机打开游戏（或离开 30 分钟以上再回来）算打开一次，资料在它下次连上服务器时更新。只记手机型号、系统、浏览器、屏幕、时区和游戏版本，不记位置和个人资料。<br>「旧资料」是 2026.11.14a 以前留下的，没有装置纪录；其中暱称「a」「豆沙妈」、兔子是 5～6 天大成年兔的，是自动化测试留下的。</p>
+</main>
+<script>
+let DB='https://pocket-bunny-default-rtdb.asia-southeast1.firebasedatabase.app',KEY='AIzaSyB5lYprszrtyGlKYw56I4fMnIKUl_4-_l8',TOK='https://securetoken.googleapis.com';
+const LOCAL=/^(localhost|127\.)/.test(location.hostname);
+try{const c=JSON.parse(localStorage.getItem('tuwo_netcfg')||'null');if(c&&c.db&&LOCAL){DB=c.db.replace(/\/+$/,'');KEY=c.key;TOK=c.tokUrl||TOK;}}catch(e){}
+const DEV_UIDS=['xLddziP2wRMsZzd6Wvaze2Xyde42'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=ms=>{if(!ms)return'—';const d=new Date(ms);return d.toLocaleString('zh-CN',{timeZone:'Asia/Kuala_Lumpur',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});};
+const ago=ms=>{if(!ms)return'';const m=(Date.now()-ms)/60000;if(m<2)return'刚刚';if(m<60)return Math.round(m)+' 分钟前';const h=m/60;if(h<24)return Math.round(h)+' 小时前';return Math.round(h/24)+' 天前';};
+let VIEW='real',DATA=null;
+async function token(){
+  let S=null;try{S=JSON.parse(localStorage.getItem('pocketBunny.v2')||'null');}catch(e){}
+  const n=S&&S.net;if(!n||!n.rt||!n.uid)return{err:'这个浏览器里没有你的游戏资料。请用你平常玩口袋兔子的手机或浏览器打开这一页。'};
+  if(!LOCAL&&!DEV_UIDS.includes(n.uid))return{err:'这一页只有开发者能看。'};
+  const r=await fetch(TOK+'/v1/token?key='+KEY,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(n.rt)});
+  const j=await r.json();if(!j.id_token)return{err:'登录失败，请先打开游戏让它连上服务器，再回来这一页。'};return{tok:j.id_token,me:n.uid};}
+function isTestOld(p){if(p.dev)return false;if(p.fr&&p.fr.length)return false;if(p.nick==='a'||p.nick==='豆沙妈')return true;
+  const rs=Object.values(p.rb||{}).map(v=>v&&v.p||{});return rs.length>0&&rs[0].st==='adult'&&+rs[0].ag>=6800&&+rs[0].ag<=9100;}
+function card(u,p,ALL,me){const d=p.dev||{};const rs=Object.values(p.rb||{}).map(v=>v&&v.p?v.p.nm+(v.s&&v.s.mn?'★':''):'').filter(Boolean);
+  const fr=(p.fr||[]).map(f=>ALL[f]?(ALL[f].nick||'兔主人')+'（'+Object.values(ALL[f].rb||{}).map(v=>v&&v.p&&v.p.nm).filter(Boolean).slice(0,2).join('、')+'）':'?');
+  const live=Date.now()-(p.at||0)<10*60000;const phone=[d.model,d.os,d.br].filter(Boolean).join(' · ')||'（旧资料，没有装置纪录）';
+  return `<div class="card ${p.dev?'':'old'}"><div class="top"><span class="name">${esc(p.nick||'兔主人')}${u===me?'（你）':''}</span><span class="when">${live?'<span class="live">● 在线</span> ':''}最后上线 ${fmt(p.at)}（${ago(p.at)}）</span></div>
+  <div class="rows"><span class="k">兔子</span><span>${rs.map(x=>`<span class="chip">${esc(x)}</span>`).join('')||'—'}</span>
+  <span class="k">好友</span><span>${fr.length?fr.map(esc).join('、'):'没有'}</span>
+  <span class="k">手机</span><span>${esc(phone)}${d.pwa?' · 已装到桌面':''}</span>
+  ${p.dev?`<span class="k">第一次</span><span>${fmt(d.first)}</span><span class="k">打开</span><span>${d.n||0} 次 · 版本 ${esc(d.v||'')}</span><span class="k">屏幕</span><span>${esc(d.scr||'')} · ${esc(d.tz||'')} · ${esc(d.lang||'')}</span>`:''}</div>
+  ${p.dev&&d.opens&&d.opens.length?`<div class="opens">最近打开：${d.opens.slice().reverse().map(fmt).join('　')}</div>`:''}</div>`;}
+function render(){const{ALL,me}=DATA;const E=Object.entries(ALL).filter(([u,p])=>p&&typeof p==='object');
+  const rec=E.filter(([u,p])=>p.dev),oldReal=E.filter(([u,p])=>!p.dev&&!isTestOld(p)),test=E.filter(([u,p])=>isTestOld(p));
+  const act=h=>rec.filter(([u,p])=>Date.now()-(p.at||0)<h*3600e3).length;
+  $('#sub').textContent=`更新于 ${fmt(Date.now())} · 有装置纪录的手机 ${rec.length} 台`;
+  const L=VIEW==='real'?rec:VIEW==='old'?oldReal:test;
+  $('#out').innerHTML=`<div class="stats"><div class="stat"><b>${act(24)}</b><span>24 小时内上线</span></div><div class="stat"><b>${act(72)}</b><span>3 天内</span></div><div class="stat"><b>${act(168)}</b><span>7 天内</span></div><div class="stat"><b>${rec.length}</b><span>有纪录的手机</span></div></div>
+  <div class="bar"><button data-v="real" class="${VIEW==='real'?'on':''}">有装置纪录（${rec.length}）</button><button data-v="old" class="${VIEW==='old'?'on':''}">旧资料·可能是真人（${oldReal.length}）</button><button data-v="test" class="${VIEW==='test'?'on':''}">测试留下的（${test.length}）</button><button id="re">重新整理</button></div>
+  ${L.sort((a,b)=>(b[1].at||0)-(a[1].at||0)).map(([u,p])=>card(u,p,ALL,me)).join('')||'<div class="msg">没有资料。手机更新到 2026.11.14a、打开游戏后就会出现。</div>'}`;
+  document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();});$('#re').onclick=load;}
+async function load(){$('#sub').textContent='读取中…';try{const t=await token();if(t.err){$('#sub').textContent='';$('#out').innerHTML=`<div class="msg">${esc(t.err)}</div>`;return;}
+  const r=await fetch(`${DB}/players.json?auth=${t.tok}`);const ALL=await r.json();if(!ALL||ALL.error)throw new Error(ALL&&ALL.error||'读取失败');DATA={ALL,me:t.me};render();}
+  catch(e){$('#sub').textContent='';$('#out').innerHTML=`<div class="msg">读取失败：${esc(e.message)}。请确认有网络，再按重新整理。</div><div class="bar"><button id="re">重新整理</button></div>`;$('#re').onclick=load;}}
+load();
+</script>
+</body>
+</html>

@@ -3008,7 +3008,9 @@ function guestDate(g){
 // 服务器设定：贴上 Firebase 给的数据库网址和网络 API 金钥
 const NETCFG={db:'https://pocket-bunny-default-rtdb.asia-southeast1.firebasedatabase.app',key:'AIzaSyB5lYprszrtyGlKYw56I4fMnIKUl_4-_l8'};
 const NET={tok:null,exp:0,status:'off',live:{},es:{},inbox:null,lastPub:0,dirty:true,timer:null,replyTo:null,err:''};
-function netCfg(){let o=null;try{o=JSON.parse(localStorage.getItem('tuwo_netcfg')||'null');}catch(e){}const c=o&&o.db?o:NETCFG;return c.db&&c.key?{db:c.db.replace(/\/+$/,''),key:c.key,auth:c.auth||'https://identitytoolkit.googleapis.com',tok:c.tokUrl||'https://securetoken.googleapis.com'}:null;}
+// 2026.11.14a：自动化测试（navigator.webdriver）或本机网址，没有指定测试服务器就不连正式服务器（以前测试在服务器上留下一百多个假玩家）
+const TEST_ENV=(()=>{try{return !!navigator.webdriver||/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);}catch(e){return false;}})();
+function netCfg(){let o=null;try{o=JSON.parse(localStorage.getItem('tuwo_netcfg')||'null');}catch(e){}if(!(o&&o.db)&&TEST_ENV)return null;const c=o&&o.db?o:NETCFG;return c.db&&c.key?{db:c.db.replace(/\/+$/,''),key:c.key,auth:c.auth||'https://identitytoolkit.googleapis.com',tok:c.tokUrl||'https://securetoken.googleapis.com'}:null;}
 const netOn=()=>NET.status==='online';
 function netS(){S.net=S.net||{friends:{},inq:[],done:[]};S.net.friends=S.net.friends||{};S.net.inq=S.net.inq||[];S.net.done=S.net.done||[];return S.net;}
 async function netAuth(){
@@ -3054,12 +3056,28 @@ const fmtCode=c=>c?`TU-${c.slice(0,3)}${c.slice(3)}`:'';
 const FCODE_RE=/TU[^A-Z0-9]{0,3}([A-Z0-9]{6})(?![A-Z0-9])/;
 const normCode=s=>{const u=String(s||'').toUpperCase();const m=u.match(FCODE_RE);if(m)return m[1];const t=u.replace(/[^A-Z0-9]/g,'');return t.length===8&&t.startsWith('TU')?t.slice(2):t;};
 function rabbitStatus(r){const t=now();return{st:r.stage,mn:isMain(r)?1:0,h:r.happy,hu:r.hunger,sk:r.sick?1:0,pg:r.preg?1:0,aw:awayR(r)?1:0,sl:isAsleep(r,t)?1:0,sit:sitWindow(),ag:Math.floor((t-r.born)/MIN/1440*10)/10};}
+
+/* ---------- 装置纪录（2026.11.14a）：每台连上来的手机都在自己的玩家资料里留一份真实纪录 ---------- */
+// 打开一次＝开游戏、或离开 30 分钟以上再回来。只记手机型号、系统、浏览器、屏幕、时区、版本，不记位置和个人资料。
+let DEV_MODEL=null;
+function devUA(){const u=navigator.userAgent||'';let os='其他',br='其他';
+  let m=u.match(/Android ([\d.]+)/);if(m)os='Android '+m[1];else if(m=u.match(/(iPhone|iPad).*OS ([\d_]+)/))os=m[1]+' iOS '+m[2].replace(/_/g,'.');else if(/Windows/.test(u))os='Windows';else if(/Mac OS X/.test(u))os='Mac';else if(/Linux/.test(u))os='Linux';
+  if(/SamsungBrowser/.test(u))br='三星浏览器';else if(/EdgA?\//.test(u))br='Edge';else if(/CriOS|Chrome\//.test(u))br='Chrome';else if(/FxiOS|Firefox/.test(u))br='Firefox';else if(/Safari/.test(u))br='Safari';
+  let model='';const a=u.match(/Android [\d.]+; ([^;)]+)[;)]/);if(a&&a[1]!=='K')model=a[1].replace(/ Build.*/,'').trim();
+  return{os,br,model};}
+function devModelAsk(){try{const d=navigator.userAgentData;if(d&&d.getHighEntropyValues)d.getHighEntropyValues(['model','platformVersion']).then(v=>{DEV_MODEL={model:v.model||'',pv:v.platformVersion||''};if(S){S.devRec=S.devRec||{};if(v.model)S.devRec.model=v.model;NET.dirty=true;}}).catch(()=>{});}catch(e){}}
+function devOpen(){if(!S)return;const t=Date.now();const R=S.devRec=S.devRec||{first:t,n:0,opens:[]};if(!R.first)R.first=t;if(!Array.isArray(R.opens))R.opens=[];
+  R.n=(R.n||0)+1;R.opens.push(t);if(R.opens.length>20)R.opens.splice(0,R.opens.length-20);R.last=t;NET.dirty=true;}
+function devInfo(){if(!S.devRec||!S.devRec.n)devOpen();const R=S.devRec||{};const ua=devUA();let pwa=0;try{pwa=(matchMedia('(display-mode: standalone)').matches||navigator.standalone)?1:0;}catch(e){}
+  let tz='';try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){}
+  return{first:R.first||Date.now(),n:R.n||1,opens:(R.opens||[]).slice(-20),seen:Date.now(),v:GAME_VER,os:ua.os,br:ua.br,model:R.model||ua.model||'',pwa,
+    scr:`${screen.width||0}x${screen.height||0}`,tz,lang:navigator.language||'',web:IS_WEB?1:0};}
 async function netPublish(force){
   if(!netOn())return;const n=netS();if(!force&&!NET.dirty&&Date.now()-NET.lastPub<180000)return;if(!force&&Date.now()-NET.lastPub<20000)return;
   NET.dirty=false;NET.lastPub=Date.now();
   const pubR=FAM&&FAM.own?(FAM.own.rabbits||[]).filter(r=>!r.temp&&!r.guest):household().filter(r=>!r.famOwner);
   const rb={};for(const r of pubR){if(r.stage==='nest')continue;rb[r.uid]={p:packR(r),s:rabbitStatus(r),lv:loveExport(r.uid)};}
-  const body={nick:S.nick||'兔主人',code:n.code,pid:pid(),at:Date.now(),rb,fr:Object.keys(n.friends).slice(0,40)};try{const pp=pushPayload(force);if(pp)body.push=pp;}catch(e){}
+  const body={nick:S.nick||'兔主人',code:n.code,pid:pid(),at:Date.now(),rb,fr:Object.keys(n.friends).slice(0,40)};try{body.dev=devInfo();}catch(e){}try{const pp=pushPayload(force);if(pp)body.push=pp;}catch(e){}
   try{await api('PUT','players/'+n.uid,body);}catch(e){NET.dirty=true;}
 }
 function netMark(){NET.dirty=true;}
@@ -3223,7 +3241,7 @@ function addFriendScreen(){return{name:'rename',idx:0,hint(){return'输入好友
   html(){return`<div class="panel"><div class="ttl">加好友</div><div class="body"><p><label for="fcode">输入朋友的好友码（TU- 后面6个字）</label></p><input id="fcode" maxlength="300" autocomplete="off" autocapitalize="characters" placeholder="TU-ABC123"></div></div>`;}};}
 
 /* ================= 搬家（存档转移）与网址版 ================= */
-const GAME_VER='2026.11.13a';
+const GAME_VER='2026.11.14a';
 const WEB_URL='https://lawrancelow.github.io/pocket-bunny/';
 const IS_WEB=/^https?:/.test(location.protocol)&&!/claude|claudeusercontent/.test(location.host);
 const b64u=u8=>{let s='';for(let i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');};
@@ -5327,7 +5345,8 @@ scr.addEventListener('pointerdown',e=>{
   FOLLOW={x:lx,y:ly,until:performance.now()+700};followDown=true;try{scr.setPointerCapture(e.pointerId);}catch(_){}
   const n=S.nests.find(n=>!n.pick&&Math.abs(lx-n.x)<12&&ly>52);if(n)cap('兔宝宝在毛窝里喝奶，过几个小时就会出来');
 });
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick();else{save();try{if(pushOn()&&netOn()){PRED_AT=0;netPublish(true);}}catch(e){}try{cloudBackup(BK_HIDE).catch(()=>{});}catch(e){}}});
+let HID_AT=0;
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(HID_AT&&Date.now()-HID_AT>=30*60000)try{devOpen();}catch(e){}HID_AT=0;tick();}else{HID_AT=Date.now();save();try{if(pushOn()&&netOn()){PRED_AT=0;netPublish(true);}}catch(e){}try{cloudBackup(BK_HIDE).catch(()=>{});}catch(e){}}});
 window.addEventListener('pagehide',save);
 
 /* ================= layout ================= */
@@ -5355,6 +5374,7 @@ function boot(){
   setInterval(()=>{tick(false);if(famMirror())return;try{if(mode==='main'&&!M&&sitterMeetCheck())return;}catch(e){console.error(e);}try{surpriseCheck();}catch(e){console.error(e);}},1000);
   setInterval(()=>{try{famRetro();if(S.famQ&&!S.fam)famCreate();if(S.fam&&!FAM)famStart();famTick();famNotice();}catch(e){console.error(e);}},4000);
   requestAnimationFrame(frame);
+  try{devOpen();devModelAsk();save();}catch(e){}
 }
 boot();
 try{fileLauncher();webInit();webReceive();maybeInstallGuide();window.addEventListener('hashchange',()=>webReceive());}catch(e){}
